@@ -73,7 +73,14 @@ export interface Annotation {
 
 export type OutboxEntity = 'book' | 'progress' | 'annotation'
 
+/**
+ * Uma escrita local à espera de subir. Guarda a referência, não uma cópia: na
+ * hora de enviar, o estado atual do registro é lido do espelho, então uma fila
+ * atrasada nunca ressuscita um valor velho.
+ */
 export interface OutboxEntry {
+  /** `${entity}:${key}` — a chave própria dedupa reescritas do mesmo registro. */
+  id: string
   seq: number
   entity: OutboxEntity
   key: string

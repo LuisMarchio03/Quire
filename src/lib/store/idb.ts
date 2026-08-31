@@ -20,7 +20,7 @@ export interface QuireSchema extends DBSchema {
   progress: { key: string; value: Progress }
   annotations: { key: string; value: Annotation; indexes: { by_book: string } }
   /** Escritas locais à espera de subir para o Turso. */
-  outbox: { key: number; value: OutboxEntry }
+  outbox: { key: string; value: OutboxEntry }
   /** Cursor de sincronização e outras chaves soltas. */
   meta: { key: string; value: unknown }
 }
@@ -34,7 +34,7 @@ export function openQuireDb(): Promise<IDBPDatabase<QuireSchema>> {
       db.createObjectStore('books', { keyPath: 'id' }).createIndex('by_updated', 'updatedAt')
       db.createObjectStore('progress', { keyPath: 'bookId' })
       db.createObjectStore('annotations', { keyPath: 'id' }).createIndex('by_book', 'bookId')
-      db.createObjectStore('outbox', { keyPath: 'seq', autoIncrement: true })
+      db.createObjectStore('outbox', { keyPath: 'id' })
       db.createObjectStore('meta')
     },
   })
