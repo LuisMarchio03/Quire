@@ -92,10 +92,11 @@ npm run db:setup
 ### 2. Senha de acesso
 
 ```bash
-npm run hash-password
+npm run hash-password                     # pergunta a senha
+echo -n "sua senha" | npm run hash-password   # ou lê da entrada padrão
 ```
 
-Cole o valor gerado em `QUIRE_PASSWORD_HASH`. A senha em si não é guardada em
+Cole a linha gerada em `QUIRE_PASSWORD_HASH`. A senha em si não é guardada em
 lugar nenhum — só o derivado PBKDF2-SHA256 com 210 000 iterações.
 
 ### 3. Subir
