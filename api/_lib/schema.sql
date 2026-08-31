@@ -1,5 +1,10 @@
 -- Esquema do Quire no Turso. Idempotente: pode rodar quantas vezes quiser.
 -- Todo timestamp é ISO-8601 UTC em TEXT. Exclusão é sempre lógica.
+--
+-- Dois carimbos por registro, de propósito: `updated_at` vem do aparelho e
+-- decide quem vence um conflito; `synced_at` é escrito pelo servidor e é o que
+-- move o cursor de sincronização. Se o cursor usasse o relógio do aparelho, um
+-- celular adiantado faria o outro aparelho pular escritas para sempre.
 
 CREATE TABLE IF NOT EXISTS devices (
   id           TEXT PRIMARY KEY,
@@ -38,10 +43,11 @@ CREATE TABLE IF NOT EXISTS books (
   status      TEXT NOT NULL DEFAULT 'unread'
               CHECK (status IN ('unread', 'reading', 'finished')),
   added_at    TEXT NOT NULL,
-  updated_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL,               -- relógio do aparelho; resolve conflito
+  synced_at   TEXT NOT NULL,               -- relógio do servidor; move o cursor
   deleted_at  TEXT
 );
-CREATE INDEX IF NOT EXISTS books_updated_idx ON books(updated_at);
+CREATE INDEX IF NOT EXISTS books_synced_idx ON books(synced_at);
 
 -- Que aparelho tem o arquivo. Alimenta o "adicionar arquivo aqui" na estante.
 CREATE TABLE IF NOT EXISTS book_copies (
@@ -55,9 +61,10 @@ CREATE TABLE IF NOT EXISTS reading_progress (
   book_id    TEXT PRIMARY KEY,
   locator    TEXT NOT NULL,              -- JSON do Locator
   percent    REAL NOT NULL DEFAULT 0,
-  updated_at TEXT NOT NULL
+  updated_at TEXT NOT NULL,
+  synced_at  TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS progress_updated_idx ON reading_progress(updated_at);
+CREATE INDEX IF NOT EXISTS progress_synced_idx ON reading_progress(synced_at);
 
 CREATE TABLE IF NOT EXISTS annotations (
   id          TEXT PRIMARY KEY,
@@ -69,7 +76,8 @@ CREATE TABLE IF NOT EXISTS annotations (
   note_text   TEXT,
   created_at  TEXT NOT NULL,
   updated_at  TEXT NOT NULL,
+  synced_at   TEXT NOT NULL,
   deleted_at  TEXT
 );
 CREATE INDEX IF NOT EXISTS annotations_book_idx ON annotations(book_id);
-CREATE INDEX IF NOT EXISTS annotations_updated_idx ON annotations(updated_at);
+CREATE INDEX IF NOT EXISTS annotations_synced_idx ON annotations(synced_at);
