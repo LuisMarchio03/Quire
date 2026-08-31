@@ -1,0 +1,69 @@
+@import 'tailwindcss';
+
+@theme {
+  /* Cromo do app — sempre escuro e quente, para não competir com a página do livro. */
+  --color-canvas: #12100e;
+  --color-surface: #1b1815;
+  --color-surface-2: #24201c;
+  --color-surface-3: #2e2924;
+  --color-line: #332e28;
+  --color-ink: #ece7e0;
+  --color-ink-dim: #a29a90;
+  --color-ink-faint: #6f675e;
+  --color-accent: #d8a45e;
+  --color-accent-dim: #8a6533;
+  --color-danger: #d2705c;
+
+  --font-sans: 'Inter var', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-serif: 'Literata', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+
+  --radius-card: 0.75rem;
+}
+
+/* Paletas de leitura. Servem tanto ao cromo do leitor quanto ao conteúdo
+   injetado no iframe — por isso vivem em variáveis, não em classes. */
+:root {
+  --paper-bg: #faf8f5;
+  --paper-fg: #1c1917;
+  --paper-muted: #78716c;
+  --paper-accent: #a16207;
+}
+
+[data-palette='light'] { --paper-bg: #faf8f5; --paper-fg: #1c1917; --paper-muted: #78716c; --paper-accent: #a16207; }
+[data-palette='sepia'] { --paper-bg: #f3e9d6; --paper-fg: #453524; --paper-muted: #857053; --paper-accent: #96601c; }
+[data-palette='gray']  { --paper-bg: #4a4744; --paper-fg: #e8e5e1; --paper-muted: #b3ada6; --paper-accent: #e0b878; }
+[data-palette='dark']  { --paper-bg: #1c1917; --paper-fg: #cec8c1; --paper-muted: #8b837a; --paper-accent: #d8a45e; }
+[data-palette='oled']  { --paper-bg: #000000; --paper-fg: #a49d95; --paper-muted: #6b645c; --paper-accent: #bb8c4e; }
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+/* Nada de zoom acidental ao tocar duas vezes para virar página. */
+* {
+  touch-action: manipulation;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-accent) 35%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
