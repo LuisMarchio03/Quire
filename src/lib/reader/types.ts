@@ -46,6 +46,11 @@ export interface ReaderEngine {
   applyTheme(theme: ReaderTheme): void
   /** Raiz do conteúdo renderizado — é onde modo foco e anotações trabalham. */
   contentRoot(): Element | null
+  /**
+   * Documento em que o conteúdo vive. No EPUB é o do iframe, e é nele que os
+   * gestos precisam ser ouvidos: clique dentro de iframe não sobe para a página.
+   */
+  contentDocument(): Document | null
   /** Página atual dentro do capítulo e total, para a barra de progresso. */
   pageInChapter(): { page: number; pages: number }
   search(query: string, limit?: number): Promise<SearchHit[]>

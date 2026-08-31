@@ -265,6 +265,8 @@ export function createEpubEngine(book: EpubBook): ReaderEngine {
 
     contentRoot: () => content,
 
+    contentDocument: () => doc,
+
     pageInChapter: () => ({ page: page + 1, pages }),
 
     async search(query, limit = 50) {

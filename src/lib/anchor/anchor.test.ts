@@ -1,5 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { anchorToRange, rangeToAnchor, reanchorByText, rectsToPdfAnchor, resolveAnchor } from './anchor'
+import {
+  anchorFromOffsets,
+  anchorToRange,
+  rangeToAnchor,
+  reanchorByText,
+  rectsToPdfAnchor,
+  resolveAnchor,
+  selectionOffsets,
+} from './anchor'
 import type { Anchor } from '../types'
 
 let root: HTMLElement
@@ -155,5 +163,44 @@ describe('âncoras', () => {
     )
 
     expect(anchor.kind === 'pdf' && anchor.rects).toHaveLength(1)
+  })
+
+  it('mede a seleção em caracteres e volta dela para uma âncora', () => {
+    mount('<p>Era uma vez um começo.</p>')
+    const offsets = selectionOffsets(selectText('um começo'), root)!
+
+    expect(offsets).toEqual({ start: 12, end: 21 })
+    const anchor = anchorFromOffsets(root, offsets.start, offsets.end, 0)
+    expect(anchorToRange(anchor!, root)?.toString()).toBe('um começo')
+  })
+
+  it('o deslocamento não muda quando o texto ganha marcação por dentro', () => {
+    mount('<p>Era uma vez um começo.</p>')
+    const antes = selectionOffsets(selectText('um começo'), root)!
+
+    // Simula a camada de destaques envolvendo um trecho anterior.
+    root.innerHTML = '<p>Era <mark>uma vez</mark> um começo.</p>'
+    const anchor = anchorFromOffsets(root, antes.start, antes.end, 0)
+
+    expect(anchorToRange(anchor!, root)?.toString()).toBe('um começo')
+  })
+
+  it('mede seleção que começa num contêiner de elemento', () => {
+    mount('<p>Primeiro.</p><p>Segundo.</p>')
+    const range = document.createRange()
+    range.setStart(root, 0)
+    range.setEnd(root.querySelectorAll('p')[1].firstChild!, 7)
+
+    expect(selectionOffsets(range, root)).toEqual({ start: 0, end: 16 })
+  })
+
+  it('recusa seleção vazia', () => {
+    mount('<p>Texto.</p>')
+    const range = document.createRange()
+    const node = root.querySelector('p')!.firstChild!
+    range.setStart(node, 2)
+    range.setEnd(node, 2)
+
+    expect(selectionOffsets(range, root)).toBeNull()
   })
 })

@@ -1,0 +1,237 @@
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { act, render, screen, waitFor, cleanup } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { ReaderScreen } from './ReaderScreen'
+import { makeEpub, type Chapter } from '../../lib/epub/fixtures/makeEpub'
+import { createBookStore } from '../../lib/store/bookStore'
+import { localMirror } from '../../lib/store/localMirror'
+import { deleteQuireDb } from '../../lib/store/idb'
+import type { Book } from '../../lib/types'
+
+const CHAPTERS: Chapter[] = [
+  { href: 'c1.xhtml', title: 'Primeiro', body: '<p>O rio corre para o mar sem pressa.</p>' },
+  { href: 'c2.xhtml', title: 'Segundo', body: '<p>A serra guarda a chuva do inverno.</p>' },
+  { href: 'c3.xhtml', title: 'Terceiro', body: '<p>No fim, tudo volta ao rio.</p>' },
+]
+
+const BOOK: Book = {
+  id: 'livro-1',
+  title: 'Águas do Sertão',
+  author: 'Autora Exemplo',
+  format: 'epub',
+  language: 'pt-BR',
+  coverUrl: null,
+  fileSize: 100,
+  spineCount: 3,
+  status: 'unread',
+  addedAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+  deletedAt: null,
+}
+
+async function seed({ withFile = true } = {}) {
+  await localMirror.saveBook(BOOK, { queue: false })
+  if (withFile) {
+    await createBookStore().put(BOOK.id, new Blob([makeEpub({ chapters: CHAPTERS }) as BlobPart]))
+  }
+}
+
+const frame = () => document.querySelector('iframe') as HTMLIFrameElement
+const contentText = () => frame()?.contentDocument?.getElementById('quire-content')?.textContent ?? ''
+
+async function openReader() {
+  const view = render(<ReaderScreen bookId={BOOK.id} onClose={() => {}} />)
+  // O conteúdo do iframe aparece durante a montagem do motor, antes de o React
+  // terminar de aplicar o estado. Esperar pelos dois evita teste instável.
+  await waitFor(() => expect(contentText()).toContain('rio corre'))
+  await screen.findByText('Águas do Sertão')
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  })
+  return view
+}
+
+function clickAt(clientX: number) {
+  const doc = frame().contentDocument!
+  doc.dispatchEvent(new doc.defaultView!.MouseEvent('click', { clientX, bubbles: true }))
+}
+
+beforeEach(async () => {
+  localStorage.clear()
+  await deleteQuireDb()
+})
+
+afterEach(() => {
+  cleanup()
+})
+
+describe('ReaderScreen', () => {
+  it('abre o livro e mostra o título nos controles', async () => {
+    await seed()
+    await openReader()
+
+    expect(screen.getByText('Águas do Sertão')).toBeTruthy()
+  })
+
+  it('avisa quando o arquivo não está neste aparelho', async () => {
+    await seed({ withFile: false })
+
+    render(<ReaderScreen bookId={BOOK.id} onClose={() => {}} />)
+
+    expect(await screen.findByText(/não está neste aparelho/i)).toBeTruthy()
+  })
+
+  it('avisa quando o livro não existe no acervo', async () => {
+    render(<ReaderScreen bookId="fantasma" onClose={() => {}} />)
+
+    expect(await screen.findByText(/não está no acervo/i)).toBeTruthy()
+  })
+
+  it('retoma a leitura onde parou', async () => {
+    await seed()
+    await localMirror.saveProgress({
+      bookId: BOOK.id,
+      locator: { spineIndex: 2, progressInSpine: 0 },
+      percent: 0.7,
+      updatedAt: '2026-01-02T00:00:00.000Z',
+    })
+
+    render(<ReaderScreen bookId={BOOK.id} onClose={() => {}} />)
+
+    await waitFor(() => expect(contentText()).toContain('tudo volta ao rio'))
+  })
+
+  it('toque na lateral direita avança e na esquerda volta', async () => {
+    await seed()
+    await openReader()
+
+    clickAt(950)
+    await waitFor(() => expect(contentText()).toContain('serra guarda'))
+
+    clickAt(60)
+    await waitFor(() => expect(contentText()).toContain('rio corre'))
+  })
+
+  it('toque no centro esconde e mostra os controles', async () => {
+    await seed()
+    await openReader()
+
+    clickAt(500)
+    await waitFor(() => expect(screen.queryByText('Águas do Sertão')).toBeNull())
+
+    clickAt(500)
+    await waitFor(() => expect(screen.getByText('Águas do Sertão')).toBeTruthy())
+  })
+
+  it('aumentar a fonte chega ao texto do livro', async () => {
+    await seed()
+    await openReader()
+
+    await userEvent.click(screen.getByRole('button', { name: /ajustes de leitura/i }))
+    await userEvent.click(screen.getByRole('button', { name: /aumentar tamanho/i }))
+
+    await waitFor(() => {
+      const css = frame().contentDocument!.getElementById('quire-theme')!.textContent!
+      expect(css).toContain('font-size: 20px')
+    })
+  })
+
+  it('a paleta escolhida vale na próxima abertura', async () => {
+    await seed()
+    await openReader()
+
+    await userEvent.click(screen.getByRole('button', { name: /ajustes de leitura/i }))
+    await userEvent.click(screen.getByRole('button', { name: 'Sépia' }))
+    cleanup()
+
+    render(<ReaderScreen bookId={BOOK.id} onClose={() => {}} />)
+
+    await waitFor(() => {
+      const css = frame().contentDocument!.getElementById('quire-theme')!.textContent!
+      expect(css).toContain('#f3e9d6')
+    })
+  })
+
+  it('guarda a posição depois de virar a página', async () => {
+    await seed()
+    await openReader()
+
+    clickAt(950)
+
+    await waitFor(
+      async () => expect((await localMirror.getProgress(BOOK.id))?.locator.spineIndex).toBe(1),
+      { timeout: 3000 },
+    )
+  })
+
+  it('marcar a página liga e desliga a estrela', async () => {
+    await seed()
+    await openReader()
+
+    await userEvent.click(screen.getByRole('button', { name: /marcar esta página/i }))
+    const marcada = await screen.findByRole('button', { name: /remover marca de página/i })
+    expect(marcada.getAttribute('aria-pressed')).toBe('true')
+
+    await userEvent.click(marcada)
+    expect(await screen.findByRole('button', { name: /marcar esta página/i })).toBeTruthy()
+  })
+
+  it('modo foco escurece os demais parágrafos do capítulo', async () => {
+    await seed()
+    await openReader()
+
+    await userEvent.click(screen.getByRole('button', { name: /modo foco/i }))
+
+    await waitFor(() => {
+      const root = frame().contentDocument!.getElementById('quire-content')!
+      expect(root.querySelector('[data-quire-focus="on"]')).not.toBeNull()
+    })
+  })
+
+  it('a busca no painel leva ao capítulo do resultado', async () => {
+    await seed()
+    await openReader()
+
+    await userEvent.click(screen.getByRole('button', { name: /anotações/i }))
+    await userEvent.click(screen.getByRole('button', { name: 'Buscar' }))
+    await userEvent.type(screen.getByLabelText(/buscar no livro/i), 'serra')
+    await userEvent.click(screen.getByRole('button', { name: 'Ir' }))
+
+    await userEvent.click(await screen.findByText(/serra guarda/i))
+    await waitFor(() => expect(contentText()).toContain('serra guarda'))
+  })
+
+  it('o painel de anotações começa vazio e explica o que fazer', async () => {
+    await seed()
+    await openReader()
+
+    await userEvent.click(screen.getByRole('button', { name: /anotações/i }))
+
+    expect(await screen.findByText(/selecione um trecho no texto/i)).toBeTruthy()
+  })
+
+  it('destaque criado aparece no painel e é pintado no texto', async () => {
+    await seed()
+    await openReader()
+
+    // Seleciona "rio corre" dentro do iframe, como faria o dedo do leitor.
+    const doc = frame().contentDocument!
+    const textNode = doc.getElementById('quire-content')!.querySelector('p')!.firstChild!
+    const range = doc.createRange()
+    range.setStart(textNode, 2)
+    range.setEnd(textNode, 11)
+    const selection = doc.getSelection()!
+    selection.removeAllRanges()
+    selection.addRange(range)
+    doc.dispatchEvent(new doc.defaultView!.MouseEvent('mouseup', { bubbles: true }))
+
+    await userEvent.click(await screen.findByRole('button', { name: /destacar em amarelo/i }))
+
+    await waitFor(() => {
+      expect(doc.querySelector('mark[data-quire-color="#e8c468"]')?.textContent).toBe('rio corre')
+    })
+
+    await userEvent.click(screen.getByRole('button', { name: /^anotações$/i }))
+    expect(await screen.findByText('rio corre')).toBeTruthy()
+  })
+})

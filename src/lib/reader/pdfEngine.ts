@@ -211,6 +211,8 @@ export function createPdfEngine(source: PdfSource): ReaderEngine {
 
     contentRoot: () => textLayer,
 
+    contentDocument: () => textLayer?.ownerDocument ?? null,
+
     pageInChapter: () => ({ page: pageNumber, pages: source.numPages }),
 
     async search(query, limit = 50) {

@@ -130,6 +130,64 @@ export function reanchorByText(quoted: string, root: Element, spineIndex: number
   }
 }
 
+/**
+ * Posição da seleção em caracteres, contando o texto do capítulo do começo.
+ *
+ * Serve para um caso específico e importante: quando os destaques já estão
+ * pintados, o texto continua idêntico mas a árvore de nós mudou. O
+ * deslocamento em caracteres atravessa essa diferença — mede-se com as marcas
+ * no ar e resolve-se depois de limpá-las.
+ */
+export function selectionOffsets(range: Range, root: Element): { start: number; end: number } | null {
+  const { pieces } = flattenText(root)
+
+  const offsetOf = (node: Node, offset: number): number | null => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const piece = pieces.find((p) => p.node === node)
+      return piece ? piece.start + offset : null
+    }
+    // Contêiner de elemento: o limite é o começo do filho apontado.
+    const child = node.childNodes[offset]
+    if (child) {
+      const piece = pieces.find((p) => p.node === child || child.contains(p.node))
+      if (piece) return piece.start
+    }
+    const last = [...pieces].reverse().find((p) => node.contains(p.node))
+    return last ? last.start + last.node.data.length : null
+  }
+
+  const start = offsetOf(range.startContainer, range.startOffset)
+  const end = offsetOf(range.endContainer, range.endOffset)
+  if (start === null || end === null || end <= start) return null
+  return { start, end }
+}
+
+/** O caminho de volta: deslocamento em caracteres vira âncora de nó e offset. */
+export function anchorFromOffsets(
+  root: Element,
+  start: number,
+  end: number,
+  spineIndex: number,
+): Anchor | null {
+  const { pieces } = flattenText(root)
+  const from = locate(pieces, start)
+  const to = locate(pieces, end)
+  if (!from || !to) return null
+
+  const startPath = pathTo(from.node, root)
+  const endPath = pathTo(to.node, root)
+  if (!startPath || !endPath) return null
+
+  return {
+    kind: 'epub',
+    spineIndex,
+    startPath,
+    startOffset: from.offset,
+    endPath,
+    endOffset: to.offset,
+  }
+}
+
 export interface ResolvedAnchor {
   range: Range | null
   /** Verdadeiro quando nem o caminho nem o texto citado foram encontrados. */
