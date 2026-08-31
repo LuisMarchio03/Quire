@@ -14,7 +14,8 @@
     "test": "NODE_OPTIONS=--no-experimental-webstorage vitest run",
     "test:watch": "NODE_OPTIONS=--no-experimental-webstorage vitest",
     "db:setup": "node --experimental-strip-types --env-file=.env.local scripts/setup-db.ts",
-    "hash-password": "node --experimental-strip-types scripts/hash-password.ts"
+    "hash-password": "node --experimental-strip-types scripts/hash-password.ts",
+    "test:integration": "node --env-file=.env.local ./node_modules/.bin/vitest run api/_lib/integration.test.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",

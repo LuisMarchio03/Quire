@@ -147,11 +147,11 @@ export function ReaderScreen({ bookId, onClose }: ReaderScreenProps) {
             percent: ratio,
             updatedAt: now,
           })
-          const current_book = await localMirror.getBook(bookId)
-          if (!current_book) return
+          const currentBook = await localMirror.getBook(bookId)
+          if (!currentBook) return
           const status = ratio >= 0.98 ? 'finished' : 'reading'
-          if (current_book.status !== status) {
-            await localMirror.saveBook({ ...current_book, status, updatedAt: now })
+          if (currentBook.status !== status) {
+            await localMirror.saveBook({ ...currentBook, status, updatedAt: now })
           }
         })()
       }, SAVE_DELAY_MS)
