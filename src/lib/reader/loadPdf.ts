@@ -1,3 +1,4 @@
+import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import type { PdfSource } from './pdfEngine'
 
 /**
@@ -14,11 +15,11 @@ export interface LoadedPdf extends PdfSource {
 
 let pdfjs: typeof import('pdfjs-dist') | null = null
 
+/** O pdf.js só é baixado quando um PDF é realmente aberto. */
 async function loadLibrary() {
   if (pdfjs) return pdfjs
   const lib = await import('pdfjs-dist')
-  const worker = await import('pdfjs-dist/build/pdf.worker.min.mjs?url')
-  lib.GlobalWorkerOptions.workerSrc = worker.default
+  lib.GlobalWorkerOptions.workerSrc = workerUrl
   pdfjs = lib
   return lib
 }

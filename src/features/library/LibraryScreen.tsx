@@ -1,4 +1,4 @@
-import { useRef, useState, type DragEvent } from 'react'
+import { useRef, useState, type DragEvent, type ReactNode } from 'react'
 import { useLibrary, type StatusFilter } from './useLibrary'
 import { BookCard } from './BookCard'
 
@@ -20,9 +20,11 @@ const STAGE_LABEL: Record<string, string> = {
 interface LibraryScreenProps {
   onOpen: (bookId: string) => void
   onOpenSettings?: () => void
+  /** Espaço para o indicador de sincronização, no rodapé do cabeçalho. */
+  statusSlot?: ReactNode
 }
 
-export function LibraryScreen({ onOpen, onOpenSettings }: LibraryScreenProps) {
+export function LibraryScreen({ onOpen, onOpenSettings, statusSlot }: LibraryScreenProps) {
   const library = useLibrary()
   const inputRef = useRef<HTMLInputElement>(null)
   const [pendingBookId, setPendingBookId] = useState<string | undefined>()
@@ -100,6 +102,7 @@ export function LibraryScreen({ onOpen, onOpenSettings }: LibraryScreenProps) {
             </button>
           )}
         </div>
+        {statusSlot && <div className="mx-auto max-w-6xl px-4 pb-2">{statusSlot}</div>}
       </header>
 
       <input

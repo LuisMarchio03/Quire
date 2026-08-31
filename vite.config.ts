@@ -30,6 +30,16 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,woff2,png,svg}'],
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
         navigateFallbackDenylist: [/^\/api\//],
+        runtimeCaching: [
+          {
+            // O worker do pdf.js tem mais de 1 MB. Guardar depois do primeiro
+            // PDF aberto deixa a leitura offline funcionar sem cobrar esse
+            // download de quem só lê EPUB.
+            urlPattern: /pdf\.worker.*\.mjs$/,
+            handler: 'CacheFirst',
+            options: { cacheName: 'quire-pdf-worker', expiration: { maxEntries: 2 } },
+          },
+        ],
       },
     }),
   ],
