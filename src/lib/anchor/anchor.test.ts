@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { anchorToRange, rangeToAnchor, reanchorByText, resolveAnchor } from './anchor'
+import { anchorToRange, rangeToAnchor, reanchorByText, rectsToPdfAnchor, resolveAnchor } from './anchor'
 import type { Anchor } from '../types'
 
 let root: HTMLElement
@@ -127,5 +127,33 @@ describe('âncoras', () => {
     const resolved = resolveAnchor(anchor, 'trecho', root)
 
     expect(resolved).toEqual({ range: null, orphan: false, anchor })
+  })
+
+  it('rectsToPdfAnchor normaliza os retângulos pela caixa da página', () => {
+    const box = { x: 100, y: 50, width: 400, height: 800 }
+    const anchor = rectsToPdfAnchor(
+      [{ x: 140, y: 130, width: 200, height: 16 }],
+      box,
+      4,
+    )
+
+    expect(anchor).toEqual({
+      kind: 'pdf',
+      page: 4,
+      rects: [{ x: 0.1, y: 0.1, w: 0.5, h: 0.02 }],
+    })
+  })
+
+  it('rectsToPdfAnchor descarta retângulos vazios da seleção', () => {
+    const anchor = rectsToPdfAnchor(
+      [
+        { x: 0, y: 0, width: 0, height: 10 },
+        { x: 0, y: 0, width: 10, height: 10 },
+      ],
+      { x: 0, y: 0, width: 100, height: 100 },
+      0,
+    )
+
+    expect(anchor.kind === 'pdf' && anchor.rects).toHaveLength(1)
   })
 })

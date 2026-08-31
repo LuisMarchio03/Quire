@@ -156,3 +156,34 @@ export function resolveAnchor(anchor: Anchor, quoted: string, root: Element): Re
 
   return { range: null, orphan: true, anchor }
 }
+
+export interface Box {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/**
+ * Âncora de PDF a partir dos retângulos da seleção.
+ *
+ * As coordenadas são normalizadas pela caixa da página: o mesmo destaque vale
+ * em qualquer zoom e em qualquer tela, porque o layout do PDF é fixo e só a
+ * escala muda.
+ */
+export function rectsToPdfAnchor(rects: Box[], box: Box, page: number): Anchor {
+  const width = box.width || 1
+  const height = box.height || 1
+  return {
+    kind: 'pdf',
+    page,
+    rects: rects
+      .filter((rect) => rect.width > 0 && rect.height > 0)
+      .map((rect) => ({
+        x: (rect.x - box.x) / width,
+        y: (rect.y - box.y) / height,
+        w: rect.width / width,
+        h: rect.height / height,
+      })),
+  }
+}

@@ -173,7 +173,7 @@ export async function parseEpub(bytes: Uint8Array): Promise<EpubBook> {
   if (spine.length === 0) throw new UnsupportedEpubError('o livro não tem capítulos legíveis')
 
   const coverPath = findCover(opf, manifest, files)
-  const toc = readToc(opf, manifest, files, opfDir)
+  const toc = readToc(opf, manifest, files)
 
   const resource = (path: string): EpubResource | undefined => {
     const normalized = normalize(decodeHref(path)).split('#')[0]
@@ -220,7 +220,6 @@ function readToc(
   opf: Document,
   manifest: Map<string, { id: string; href: string; properties: string }>,
   files: Map<string, Uint8Array>,
-  opfDir: string,
 ): TocEntry[] {
   const navItem = [...manifest.values()].find((i) => i.properties.split(/\s+/).includes('nav'))
   if (navItem) {
