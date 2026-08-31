@@ -74,7 +74,7 @@ describe.skipIf(!live)('Turso — esquema e sincronização', () => {
       DELETE FROM book_copies WHERE book_id LIKE '${PREFIX}%';
       DELETE FROM sessions WHERE device_id IN (SELECT id FROM devices WHERE name LIKE '${PREFIX}%');
       DELETE FROM devices WHERE name LIKE '${PREFIX}%';
-      DELETE FROM pairing_codes WHERE used_at IS NOT NULL AND created_at < datetime('now');
+      DELETE FROM pairing_codes WHERE used_at IS NOT NULL;
     `)
     client.close()
   })
