@@ -4,14 +4,21 @@ import { localMirror } from '../../lib/store/localMirror'
 import type { Book } from '../../lib/types'
 import { formatBytes } from './formatBytes'
 import { api } from '../../lib/api/client'
+import { UiScaleControl, type UiScaleControls } from './UiScaleControl'
 
 interface StorageScreenProps {
   onClose: () => void
   onLogout?: () => void
   canPair?: boolean
+  uiScale?: UiScaleControls
 }
 
-export function StorageScreen({ onClose, onLogout, canPair = false }: StorageScreenProps) {
+export function StorageScreen({
+  onClose,
+  onLogout,
+  canPair = false,
+  uiScale,
+}: StorageScreenProps) {
   const [usage, setUsage] = useState<StorageUsage | null>(null)
   const [books, setBooks] = useState<Book[]>([])
   const [localIds, setLocalIds] = useState<Set<string>>(new Set())
@@ -49,6 +56,12 @@ export function StorageScreen({ onClose, onLogout, canPair = false }: StorageScr
         </button>
         <h1 className="flex-1 font-serif text-2xl text-ink">Ajustes</h1>
       </header>
+
+      {uiScale && (
+        <section aria-label="Tamanho da interface" className="mb-5">
+          <UiScaleControl controls={uiScale} />
+        </section>
+      )}
 
       <section aria-label="Armazenamento" className="rounded-xl border border-line bg-surface p-4">
         <h2 className="text-sm font-medium text-ink">Armazenamento deste aparelho</h2>

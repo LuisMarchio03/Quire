@@ -40,8 +40,19 @@ async function seed({ withFile = true } = {}) {
 const frame = () => document.querySelector('iframe') as HTMLIFrameElement
 const contentText = () => frame()?.contentDocument?.getElementById('quire-content')?.textContent ?? ''
 
+const escalaFalsa = {
+  scale: 1,
+  increase: () => {},
+  decrease: () => {},
+  reset: () => {},
+  atMin: false,
+  atMax: false,
+}
+
 async function openReader() {
-  const view = render(<ReaderScreen bookId={BOOK.id} onClose={() => {}} />)
+  const view = render(
+    <ReaderScreen bookId={BOOK.id} onClose={() => {}} uiScale={escalaFalsa} />,
+  )
   // O conteúdo do iframe aparece durante a montagem do motor, antes de o React
   // terminar de aplicar o estado. Esperar pelos dois evita teste instável.
   await waitFor(() => expect(contentText()).toContain('rio corre'))
@@ -325,5 +336,45 @@ describe('ReaderScreen', () => {
         true,
       ),
     )
+  })
+
+  it('a pinça sobre o texto do EPUB muda o corpo da letra', async () => {
+    await seed()
+    await openReader()
+    const css = () => frame().contentDocument!.getElementById('quire-theme')!.textContent!
+    expect(css()).toContain('font-size: 19px')
+
+    const doc = frame().contentDocument!
+    const dedos = (separacao: number) => [
+      { clientX: 200 - separacao / 2, clientY: 300 },
+      { clientX: 200 + separacao / 2, clientY: 300 },
+    ]
+    const toque = (tipo: string, ativos: object[], mudados: object[] = []) => {
+      const evento = new doc.defaultView!.Event(tipo, { bubbles: true })
+      Object.defineProperty(evento, 'touches', { value: ativos })
+      Object.defineProperty(evento, 'changedTouches', { value: mudados })
+      doc.dispatchEvent(evento)
+    }
+
+    await act(async () => {
+      toque('touchstart', dedos(100))
+      toque('touchmove', dedos(200))
+      toque('touchend', [], dedos(200))
+    })
+
+    // Dedos afastados ao dobro: 19 vira 38.
+    await waitFor(() => expect(css()).toContain('font-size: 38px'))
+  })
+
+  it('o painel de leitura oferece o tamanho da interface, separado do texto', async () => {
+    await seed()
+    await openReader()
+
+    await userEvent.click(screen.getByRole('button', { name: /ajustes de leitura/i }))
+
+    expect(screen.getByText(/tamanho da interface/i)).toBeTruthy()
+    expect(screen.getByRole('button', { name: /aumentar interface/i })).toBeTruthy()
+    // O ajuste do texto continua sendo outro, e com nome próprio.
+    expect(screen.getByRole('button', { name: /aumentar tamanho/i })).toBeTruthy()
   })
 })

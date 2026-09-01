@@ -21,10 +21,12 @@ import { observeViewport, readSafeInsets } from './viewport'
 import { ReaderControls } from './ReaderControls'
 import { TypographyPanel } from './TypographyPanel'
 import { useReaderTheme } from './useReaderTheme'
+import type { UiScaleControls } from '../settings/UiScaleControl'
 
 interface ReaderScreenProps {
   bookId: string
   onClose: () => void
+  uiScale?: UiScaleControls
 }
 
 interface PendingSelection {
@@ -59,7 +61,7 @@ function boxOf(element: Element): DOMRect {
     : EMPTY_RECT
 }
 
-export function ReaderScreen({ bookId, onClose }: ReaderScreenProps) {
+export function ReaderScreen({ bookId, onClose, uiScale }: ReaderScreenProps) {
   const { theme, focus, updateTheme, updateFocus, resetTheme } = useReaderTheme()
   const annotations = useAnnotations(bookId)
 
@@ -79,6 +81,7 @@ export function ReaderScreen({ bookId, onClose }: ReaderScreenProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const clearPaint = useRef<() => void>(() => {})
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const fontAtPinchStart = useRef<number | null>(null)
 
   // ---- abertura do livro -------------------------------------------------
   useEffect(() => {
@@ -329,8 +332,9 @@ export function ReaderScreen({ bookId, onClose }: ReaderScreenProps) {
       onPrev: () => void engine.prev(),
     })
 
-    // Ampliar só faz sentido onde a página tem largura fixa. No EPUB, quem
-    // aumenta a letra é o painel de tipografia.
+    // Ampliar a página só faz sentido onde ela tem largura fixa. No EPUB o
+    // texto reflui, então o mesmo gesto muda o corpo da letra — que é o que a
+    // pessoa quer dizer ao juntar os dedos sobre um parágrafo.
     const detachPinch = engine.canZoom()
       ? attachPinch(doc, {
           onPreview: (relative) => {
@@ -346,7 +350,18 @@ export function ReaderScreen({ bookId, onClose }: ReaderScreenProps) {
           },
           onDoubleTap: () => void applyZoom(engine.getZoom() > 1 ? 1 : 2.5),
         })
-      : () => {}
+      : attachPinch(doc, {
+          onPreview: () => {
+            // Repaginar a cada milímetro travaria o aparelho; o texto só muda
+            // quando os dedos saem.
+            fontAtPinchStart.current ??= theme.fontSize
+          },
+          onCommit: (relative) => {
+            const base = fontAtPinchStart.current ?? theme.fontSize
+            fontAtPinchStart.current = null
+            updateTheme({ fontSize: Math.min(40, Math.max(12, Math.round(base * relative))) })
+          },
+        })
 
     doc.addEventListener('mouseup', onPointerUp)
     doc.addEventListener('touchend', onPointerUp)
@@ -363,7 +378,7 @@ export function ReaderScreen({ bookId, onClose }: ReaderScreenProps) {
       doc.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keydown', onKeyDown)
     }
-  }, [engine, focus.enabled, readSelection, locator.spineIndex, applyZoom])
+  }, [engine, focus.enabled, readSelection, locator.spineIndex, applyZoom, theme.fontSize, updateTheme])
 
   // ---- anotações ----------------------------------------------------------
   const anchorFromSelection = useCallback((): Anchor | null => {
@@ -493,6 +508,7 @@ export function ReaderScreen({ bookId, onClose }: ReaderScreenProps) {
         <TypographyPanel
           theme={theme}
           focus={focus}
+          uiScale={uiScale}
           onTheme={updateTheme}
           onFocus={updateFocus}
           onReset={resetTheme}

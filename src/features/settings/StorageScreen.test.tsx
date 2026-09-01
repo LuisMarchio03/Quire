@@ -111,4 +111,78 @@ describe('StorageScreen', () => {
     await screen.findByText(/usados/)
     expect(screen.queryByRole('button', { name: /gerar código/i })).toBeNull()
   })
+
+  it('mostra o controle de tamanho da interface e o aciona', async () => {
+    stubStorage()
+    const increase = vi.fn()
+    const reset = vi.fn()
+    render(
+      <StorageScreen
+        onClose={() => {}}
+        uiScale={{ scale: 1.2, increase, decrease: vi.fn(), reset, atMin: false, atMax: false }}
+      />,
+    )
+
+    expect(await screen.findByText('120%')).toBeTruthy()
+
+    await userEvent.click(screen.getByRole('button', { name: /aumentar interface/i }))
+    expect(increase).toHaveBeenCalled()
+
+    await userEvent.click(screen.getByRole('button', { name: /voltar a 100%/i }))
+    expect(reset).toHaveBeenCalled()
+  })
+
+  it('em 100% não oferece voltar ao padrão, porque já está nele', async () => {
+    stubStorage()
+    render(
+      <StorageScreen
+        onClose={() => {}}
+        uiScale={{
+          scale: 1,
+          increase: vi.fn(),
+          decrease: vi.fn(),
+          reset: vi.fn(),
+          atMin: false,
+          atMax: false,
+        }}
+      />,
+    )
+
+    await screen.findByText('100%')
+    expect(screen.queryByRole('button', { name: /voltar a 100%/i })).toBeNull()
+  })
+
+  it('nos limites, o botão correspondente fica desativado', async () => {
+    stubStorage()
+    render(
+      <StorageScreen
+        onClose={() => {}}
+        uiScale={{
+          scale: 1.6,
+          increase: vi.fn(),
+          decrease: vi.fn(),
+          reset: vi.fn(),
+          atMin: false,
+          atMax: true,
+        }}
+      />,
+    )
+
+    expect(await screen.findByRole('button', { name: /aumentar interface/i })).toHaveProperty(
+      'disabled',
+      true,
+    )
+    expect(screen.getByRole('button', { name: /diminuir interface/i })).toHaveProperty(
+      'disabled',
+      false,
+    )
+  })
+
+  it('sem o controle passado, a seção nem aparece', async () => {
+    stubStorage()
+    render(<StorageScreen onClose={() => {}} />)
+
+    await screen.findByText(/usados/)
+    expect(screen.queryByText(/tamanho da interface/i)).toBeNull()
+  })
 })

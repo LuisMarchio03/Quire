@@ -1,5 +1,6 @@
 import type { ReaderFont, ReaderPalette, ReaderTheme } from '../../lib/reader/types'
 import type { FocusOptions } from './focusMode'
+import { UiScaleControl, type UiScaleControls } from '../settings/UiScaleControl'
 
 const FONTS: Array<{ value: ReaderFont; label: string; hint: string }> = [
   { value: 'serif', label: 'Serifada', hint: 'Literata' },
@@ -18,6 +19,7 @@ const PALETTES: Array<{ value: ReaderPalette; label: string; bg: string; fg: str
 interface TypographyPanelProps {
   theme: ReaderTheme
   focus: FocusOptions
+  uiScale?: UiScaleControls
   onTheme: (patch: Partial<ReaderTheme>) => void
   onFocus: (patch: Partial<FocusOptions>) => void
   onReset: () => void
@@ -70,6 +72,7 @@ function Stepper({
 export function TypographyPanel({
   theme,
   focus,
+  uiScale,
   onTheme,
   onFocus,
   onReset,
@@ -224,12 +227,22 @@ export function TypographyPanel({
         )}
       </div>
 
+      {uiScale && (
+        <div className="mt-3 border-t border-line pt-3">
+          <UiScaleControl controls={uiScale} variant="panel" />
+          <p className="mt-1 text-xs text-ink-faint">
+            Isto muda os controles do app, não o texto do livro — o corpo do texto é o ajuste
+            “Tamanho” aqui em cima.
+          </p>
+        </div>
+      )}
+
       <button
         type="button"
         onClick={onReset}
         className="mt-4 w-full rounded-lg border border-line py-2 text-sm text-ink-dim hover:text-ink"
       >
-        Voltar ao padrão
+        Voltar ao padrão de leitura
       </button>
     </section>
   )
