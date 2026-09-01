@@ -6,6 +6,7 @@ import { localMirror } from '../store/localMirror'
 import { nowIso } from '../time'
 import type { Book, BookFormat } from '../types'
 import { makeCoverThumbnail } from './cover'
+import { normalizeTags } from './tags'
 
 export type ImportStage = 'hash' | 'leitura' | 'capa' | 'gravação' | 'pronto'
 
@@ -80,6 +81,7 @@ export async function importBook(file: File, options: ImportOptions = {}): Promi
   let author: string | null = null
   let language: string | null = null
   let spineCount = 0
+  let tags: string[] = []
   let coverSource: Blob | HTMLCanvasElement | null = null
 
   try {
@@ -89,6 +91,8 @@ export async function importBook(file: File, options: ImportOptions = {}): Promi
       author = epub.metadata.author
       language = epub.metadata.language
       spineCount = epub.spine.length
+      // EPUB costuma trazer assunto no metadado; vira etiqueta já preenchida.
+      tags = normalizeTags(epub.metadata.subjects)
       const cover = epub.coverPath ? epub.resource(epub.coverPath) : undefined
       if (cover) coverSource = new Blob([cover.bytes as BlobPart], { type: cover.mediaType })
     } else {
@@ -118,6 +122,7 @@ export async function importBook(file: File, options: ImportOptions = {}): Promi
     fileSize: file.size,
     spineCount,
     status: 'unread',
+    tags,
     addedAt: now,
     updatedAt: now,
     deletedAt: null,

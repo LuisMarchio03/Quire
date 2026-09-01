@@ -14,6 +14,7 @@ function makeBook(overrides: Partial<Book> = {}): Book {
     fileSize: 1024,
     spineCount: 12,
     status: 'unread',
+    tags: [],
     addedAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
     deletedAt: null,

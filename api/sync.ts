@@ -109,18 +109,20 @@ function toStatement(change: Change, stamp: string): InStatement {
     const b = change.data
     return {
       sql: `INSERT INTO books (id, title, author, format, language, cover_url, file_size,
-                               spine_count, status, added_at, updated_at, synced_at, deleted_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                               spine_count, status, tags, added_at, updated_at, synced_at, deleted_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
               title = excluded.title, author = excluded.author, language = excluded.language,
               cover_url = excluded.cover_url, file_size = excluded.file_size,
               spine_count = excluded.spine_count, status = excluded.status,
+              tags = excluded.tags,
               updated_at = excluded.updated_at, synced_at = excluded.synced_at,
               deleted_at = excluded.deleted_at
             WHERE excluded.updated_at > books.updated_at`,
       args: [
         b.id, b.title, b.author, b.format, b.language, b.coverUrl, b.fileSize,
-        b.spineCount, b.status, b.addedAt, b.updatedAt, stamp, b.deletedAt,
+        b.spineCount, b.status, JSON.stringify(b.tags ?? []), b.addedAt, b.updatedAt, stamp,
+        b.deletedAt,
       ],
     }
   }

@@ -35,6 +35,17 @@ export function shouldApply(incomingUpdatedAt: string, currentUpdatedAt: string 
 }
 
 const str = (v: unknown): string => String(v)
+
+/** Etiqueta trafega e é guardada como JSON; conteúdo estranho vira lista vazia. */
+function parseTags(value: unknown): string[] {
+  if (value === null || value === undefined) return []
+  try {
+    const parsed = JSON.parse(String(value))
+    return Array.isArray(parsed) ? parsed.filter((tag) => typeof tag === 'string') : []
+  } catch {
+    return []
+  }
+}
 const nullableStr = (v: unknown): string | null => (v === null || v === undefined ? null : String(v))
 
 export function rowToBook(row: Row): Book {
@@ -48,6 +59,7 @@ export function rowToBook(row: Row): Book {
     fileSize: Number(row.file_size),
     spineCount: Number(row.spine_count),
     status: str(row.status) as BookStatus,
+    tags: parseTags(row.tags),
     addedAt: str(row.added_at),
     updatedAt: str(row.updated_at),
     deletedAt: nullableStr(row.deleted_at),
@@ -86,6 +98,8 @@ const isObject = (v: unknown): v is Row => typeof v === 'object' && v !== null &
 const isId = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= 200
 const isStamp = (v: unknown): v is string => typeof v === 'string' && v.length >= 20
 const isOptionalStamp = (v: unknown): boolean => v === null || v === undefined || isStamp(v)
+const isTagList = (v: unknown): v is string[] =>
+  Array.isArray(v) && v.length <= 64 && v.every((tag) => typeof tag === 'string' && tag.length <= 80)
 
 /**
  * A única porta por onde dado de fora entra no banco. É app de um usuário só,
@@ -100,7 +114,8 @@ export function parseChange(raw: unknown): Change | null {
     if (!isId(data.id) || !isStamp(data.updatedAt) || !isStamp(data.addedAt)) return null
     if (typeof data.title !== 'string' || !FORMATS.includes(String(data.format))) return null
     if (!STATUSES.includes(String(data.status)) || !isOptionalStamp(data.deletedAt)) return null
-    return { entity: 'book', data: data as unknown as Book }
+    if (data.tags !== undefined && !isTagList(data.tags)) return null
+    return { entity: 'book', data: { ...data, tags: data.tags ?? [] } as unknown as Book }
   }
 
   if (raw.entity === 'progress') {

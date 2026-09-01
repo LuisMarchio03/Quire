@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS books (
   spine_count INTEGER NOT NULL DEFAULT 0,
   status      TEXT NOT NULL DEFAULT 'unread'
               CHECK (status IN ('unread', 'reading', 'finished')),
+  tags        TEXT NOT NULL DEFAULT '[]',   -- JSON com as etiquetas do livro
   added_at    TEXT NOT NULL,
   updated_at  TEXT NOT NULL,               -- relógio do aparelho; resolve conflito
   synced_at   TEXT NOT NULL,               -- relógio do servidor; move o cursor

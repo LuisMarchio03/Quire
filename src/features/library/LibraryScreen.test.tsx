@@ -18,6 +18,7 @@ const book = (overrides: Partial<Book> = {}): Book => ({
   fileSize: 1000,
   spineCount: 10,
   status: 'unread',
+  tags: [],
   addedAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
   deletedAt: null,
@@ -223,6 +224,40 @@ describe('LibraryScreen — menu do livro', () => {
     await userEvent.click(screen.getByRole('button', { name: /remover arquivo daqui/i }))
 
     await waitFor(() => expect(screen.getByText(/não está neste aparelho/i)).toBeTruthy())
+    expect((await localMirror.getBook('id-1'))?.deletedAt).toBeNull()
+  })
+
+  it('o menu não fica dentro da caixa que recorta a capa', async () => {
+    await seed([book()], ['id-1'])
+    render(<LibraryScreen onOpen={() => {}} />)
+
+    const botao = await screen.findByRole('button', { name: /opções de grande sertão/i })
+    // A capa é recortada para arredondar as bordas; um menu ali dentro sai
+    // cortado nas laterais em vez de flutuar sobre o cartão.
+    expect(botao.closest('.overflow-hidden')).toBeNull()
+  })
+
+  it('a confirmação de exclusão é um diálogo, não um balão apertado', async () => {
+    await seed([book()], ['id-1'])
+    render(<LibraryScreen onOpen={() => {}} />)
+    await userEvent.click(await screen.findByRole('button', { name: /opções de grande sertão/i }))
+
+    await userEvent.click(screen.getByRole('button', { name: /excluir do acervo/i }))
+
+    const dialogo = screen.getByRole('dialog')
+    expect(dialogo.textContent).toMatch(/tem certeza/i)
+    expect(dialogo.closest('.overflow-hidden')).toBeNull()
+  })
+
+  it('o diálogo fecha ao cancelar, sem apagar nada', async () => {
+    await seed([book()], ['id-1'])
+    render(<LibraryScreen onOpen={() => {}} />)
+    await userEvent.click(await screen.findByRole('button', { name: /opções de grande sertão/i }))
+    await userEvent.click(screen.getByRole('button', { name: /excluir do acervo/i }))
+
+    await userEvent.click(screen.getByRole('button', { name: /cancelar/i }))
+
+    expect(screen.queryByRole('dialog')).toBeNull()
     expect((await localMirror.getBook('id-1'))?.deletedAt).toBeNull()
   })
 })

@@ -46,6 +46,8 @@ export interface Book {
   fileSize: number
   spineCount: number
   status: BookStatus
+  /** Etiquetas livres. Moram no próprio livro para sincronizarem junto com ele. */
+  tags: string[]
   addedAt: string
   updatedAt: string
   deletedAt: string | null

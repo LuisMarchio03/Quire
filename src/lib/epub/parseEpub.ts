@@ -30,6 +30,8 @@ export interface EpubMetadata {
   title: string
   author: string | null
   language: string | null
+  /** `dc:subject` — o assunto que a editora declarou. Vira etiqueta sugerida. */
+  subjects: string[]
 }
 
 export interface EpubBook {
@@ -142,6 +144,11 @@ export async function parseEpub(bytes: Uint8Array): Promise<EpubBook> {
     title: (metadataEl && firstText(metadataEl, 'title')) ?? 'Sem título',
     author: metadataEl ? firstText(metadataEl, 'creator') : null,
     language: metadataEl ? firstText(metadataEl, 'language') : null,
+    subjects: metadataEl
+      ? byLocalName(metadataEl, 'subject')
+          .map((el) => el.textContent?.trim() ?? '')
+          .filter(Boolean)
+      : [],
   }
 
   interface ManifestItem {

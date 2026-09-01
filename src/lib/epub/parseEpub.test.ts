@@ -10,6 +10,7 @@ describe('parseEpub', () => {
       title: 'Memórias Póstumas',
       author: 'Machado',
       language: 'pt-BR',
+      subjects: [],
     })
   })
 

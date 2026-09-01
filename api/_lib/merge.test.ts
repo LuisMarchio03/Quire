@@ -23,13 +23,13 @@ describe('linhas do banco viram objetos de domínio', () => {
   it('livro', () => {
     const book = rowToBook({
       id: 'h1', title: 'Grande Sertão', author: null, format: 'epub', language: 'pt',
-      cover_url: null, file_size: 42, spine_count: 3, status: 'reading',
+      cover_url: null, file_size: 42, spine_count: 3, status: 'reading', tags: '["Ficção"]',
       added_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-01-02T00:00:00.000Z',
       synced_at: '2026-01-03T00:00:00.000Z', deleted_at: null,
     })
     expect(book).toEqual({
       id: 'h1', title: 'Grande Sertão', author: null, format: 'epub', language: 'pt',
-      coverUrl: null, fileSize: 42, spineCount: 3, status: 'reading',
+      coverUrl: null, fileSize: 42, spineCount: 3, status: 'reading', tags: ['Ficção'],
       addedAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-02T00:00:00.000Z', deletedAt: null,
     })
   })
@@ -58,7 +58,7 @@ describe('linhas do banco viram objetos de domínio', () => {
 describe('parseChange', () => {
   const book = {
     id: 'h1', title: 'Livro', author: null, format: 'epub', language: null, coverUrl: null,
-    fileSize: 1, spineCount: 1, status: 'unread', addedAt: '2026-01-01T00:00:00.000Z',
+    fileSize: 1, spineCount: 1, status: 'unread', tags: [], addedAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z', deletedAt: null,
   }
 
@@ -99,6 +99,57 @@ describe('parseChange', () => {
   it('recusa progresso sem locator', () => {
     expect(
       parseChange({ entity: 'progress', data: { bookId: 'h1', percent: 0.1, updatedAt: '2026-01-01T00:00:00.000Z' } }),
+    ).toBeNull()
+  })
+})
+
+describe('etiquetas na sincronização', () => {
+  const linhaBase = {
+    id: 'h1', title: 'Livro', author: null, format: 'epub', language: null,
+    cover_url: null, file_size: 1, spine_count: 1, status: 'unread',
+    added_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-01-01T00:00:00.000Z',
+    synced_at: '2026-01-01T00:00:00.000Z', deleted_at: null,
+  }
+
+  it('lê a lista guardada como JSON', () => {
+    expect(rowToBook({ ...linhaBase, tags: '["Ficção","Brasil"]' }).tags).toEqual([
+      'Ficção',
+      'Brasil',
+    ])
+  })
+
+  it('banco antigo sem a coluna vira lista vazia', () => {
+    expect(rowToBook({ ...linhaBase, tags: null }).tags).toEqual([])
+    expect(rowToBook(linhaBase).tags).toEqual([])
+  })
+
+  it('conteúdo estragado não derruba a leitura', () => {
+    expect(rowToBook({ ...linhaBase, tags: 'não é json' }).tags).toEqual([])
+    expect(rowToBook({ ...linhaBase, tags: '{"a":1}' }).tags).toEqual([])
+    expect(rowToBook({ ...linhaBase, tags: '[1,"boa",null]' }).tags).toEqual(['boa'])
+  })
+
+  const livro = {
+    id: 'h1', title: 'Livro', author: null, format: 'epub', language: null, coverUrl: null,
+    fileSize: 1, spineCount: 1, status: 'unread', addedAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z', deletedAt: null,
+  }
+
+  it('aceita etiquetas bem formadas', () => {
+    const change = parseChange({ entity: 'book', data: { ...livro, tags: ['Ficção'] } })
+    expect(change?.entity === 'book' && change.data.tags).toEqual(['Ficção'])
+  })
+
+  it('livro sem o campo entra com lista vazia', () => {
+    const change = parseChange({ entity: 'book', data: livro })
+    expect(change?.entity === 'book' && change.data.tags).toEqual([])
+  })
+
+  it('recusa etiqueta que não é texto ou lista longa demais', () => {
+    expect(parseChange({ entity: 'book', data: { ...livro, tags: 'ficção' } })).toBeNull()
+    expect(parseChange({ entity: 'book', data: { ...livro, tags: [3] } })).toBeNull()
+    expect(
+      parseChange({ entity: 'book', data: { ...livro, tags: Array(100).fill('x') } }),
     ).toBeNull()
   })
 })

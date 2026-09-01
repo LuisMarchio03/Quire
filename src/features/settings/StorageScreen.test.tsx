@@ -17,6 +17,7 @@ const book = (overrides: Partial<Book> = {}): Book => ({
   fileSize: 2_500_000,
   spineCount: 10,
   status: 'reading',
+  tags: [],
   addedAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
   deletedAt: null,

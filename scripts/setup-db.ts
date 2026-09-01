@@ -17,6 +17,19 @@ const client = createClient({ url, authToken })
 
 await client.executeMultiple(readFileSync(schemaPath, 'utf8'))
 
+// `CREATE TABLE IF NOT EXISTS` não toca em tabela que já existe, então coluna
+// nova precisa ser acrescentada à parte para um banco antigo alcançar o esquema.
+const MIGRACOES: Array<{ tabela: string; coluna: string; definicao: string }> = [
+  { tabela: 'books', coluna: 'tags', definicao: "TEXT NOT NULL DEFAULT '[]'" },
+]
+
+for (const { tabela, coluna, definicao } of MIGRACOES) {
+  const { rows } = await client.execute(`PRAGMA table_info(${tabela})`)
+  if (rows.some((row) => row.name === coluna)) continue
+  await client.execute(`ALTER TABLE ${tabela} ADD COLUMN ${coluna} ${definicao}`)
+  console.log(`Coluna ${tabela}.${coluna} acrescentada.`)
+}
+
 const { rows } = await client.execute(
   "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
 )
