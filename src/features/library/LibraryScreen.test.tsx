@@ -152,3 +152,77 @@ describe('LibraryScreen', () => {
     expect(await screen.findByText(/42%/)).toBeTruthy()
   })
 })
+
+describe('LibraryScreen — menu do livro', () => {
+  beforeEach(async () => {
+    await deleteQuireDb()
+  })
+
+  it('o botão de opções fica visível sem depender de passar o mouse', async () => {
+    await seed([book()], ['id-1'])
+    render(<LibraryScreen onOpen={() => {}} />)
+
+    const botao = await screen.findByRole('button', { name: /opções de grande sertão/i })
+    // Em celular não existe hover: esconder por opacidade deixaria o menu
+    // inalcançável. Só some antes do hover onde hover realmente existe.
+    expect(botao.className).not.toMatch(/\bopacity-0\b/)
+    expect(botao.closest('[data-quire-menu]')?.className).toMatch(/hover:hover/)
+  })
+
+  it('abrir o menu não abre o livro por baixo', async () => {
+    await seed([book()], ['id-1'])
+    const onOpen = vi.fn()
+    render(<LibraryScreen onOpen={onOpen} />)
+
+    await userEvent.click(await screen.findByRole('button', { name: /opções de grande sertão/i }))
+
+    expect(onOpen).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: /excluir do acervo/i })).toBeTruthy()
+  })
+
+  it('excluir pede confirmação antes de apagar', async () => {
+    await seed([book()], ['id-1'])
+    render(<LibraryScreen onOpen={() => {}} />)
+    await userEvent.click(await screen.findByRole('button', { name: /opções de grande sertão/i }))
+
+    await userEvent.click(screen.getByRole('button', { name: /excluir do acervo/i }))
+
+    expect(screen.getByText(/tem certeza/i)).toBeTruthy()
+    expect(await localMirror.getBook('id-1')).toBeDefined()
+  })
+
+  it('confirmando, o livro sai da estante', async () => {
+    await seed([book()], ['id-1'])
+    render(<LibraryScreen onOpen={() => {}} />)
+    await userEvent.click(await screen.findByRole('button', { name: /opções de grande sertão/i }))
+    await userEvent.click(screen.getByRole('button', { name: /excluir do acervo/i }))
+
+    await userEvent.click(screen.getByRole('button', { name: /sim, excluir/i }))
+
+    await waitFor(() => expect(screen.queryByRole('heading', { name: /grande sertão/i })).toBeNull())
+    expect((await localMirror.getBook('id-1'))?.deletedAt).toBeTruthy()
+  })
+
+  it('desistindo, nada é apagado', async () => {
+    await seed([book()], ['id-1'])
+    render(<LibraryScreen onOpen={() => {}} />)
+    await userEvent.click(await screen.findByRole('button', { name: /opções de grande sertão/i }))
+    await userEvent.click(screen.getByRole('button', { name: /excluir do acervo/i }))
+
+    await userEvent.click(screen.getByRole('button', { name: /cancelar/i }))
+
+    expect(screen.getByRole('heading', { name: /grande sertão/i })).toBeTruthy()
+    expect((await localMirror.getBook('id-1'))?.deletedAt).toBeNull()
+  })
+
+  it('remover só o arquivo mantém o livro na estante', async () => {
+    await seed([book()], ['id-1'])
+    render(<LibraryScreen onOpen={() => {}} />)
+    await userEvent.click(await screen.findByRole('button', { name: /opções de grande sertão/i }))
+
+    await userEvent.click(screen.getByRole('button', { name: /remover arquivo daqui/i }))
+
+    await waitFor(() => expect(screen.getByText(/não está neste aparelho/i)).toBeTruthy())
+    expect((await localMirror.getBook('id-1'))?.deletedAt).toBeNull()
+  })
+})
