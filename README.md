@@ -10,7 +10,7 @@
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38BDF8?logo=tailwindcss&logoColor=white)
 ![Turso](https://img.shields.io/badge/Turso-libSQL-4FF8D2?logo=turso&logoColor=black)
 ![PWA](https://img.shields.io/badge/PWA-instalável-5A0FC8?logo=pwa&logoColor=white)
-![Testes](https://img.shields.io/badge/testes-210%20passando-3FB950)
+![Testes](https://img.shields.io/badge/testes-352%20passando-3FB950)
 
 </div>
 
@@ -57,6 +57,10 @@ registro.
 - **Destaques, notas e marcas de página**, com âncoras que sobrevivem a mudança
   de fonte, de tela e de paginação — e que se reancoram pelo texto citado quando
   o documento muda.
+- **Etiquetas livres**, com fichas clicáveis na estante que se combinam, e um
+  campo de busca só que casa título, autor e etiqueta. EPUB traz as etiquetas
+  sugeridas do próprio metadado.
+- **Tamanho da interface ajustável** (80% a 150%), por atalho, pinça ou ajustes.
 - **Busca dentro do livro**, ignorando acento e caixa.
 - **Exportação em Markdown** de tudo que você marcou.
 - **PWA instalável**, que funciona offline por inteiro.
@@ -103,7 +107,7 @@ lugar nenhum — só o derivado PBKDF2-SHA256 com 210 000 iterações.
 
 ```bash
 npm run dev      # http://localhost:5273
-npm test         # 210 testes
+npm test         # 352 testes
 npm run build
 ```
 
