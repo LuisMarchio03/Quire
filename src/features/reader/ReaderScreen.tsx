@@ -15,6 +15,9 @@ import { paintHighlights } from '../annotations/highlightLayer'
 import { SelectionMenu } from '../annotations/SelectionMenu'
 import { AnnotationsPanel } from '../annotations/AnnotationsPanel'
 import { applyFocusMode, clearFocusMode, focusNext, focusPrev } from './focusMode'
+import { attachPinch } from './pinch'
+import { attachSwipe } from './swipe'
+import { observeViewport, readSafeInsets } from './viewport'
 import { ReaderControls } from './ReaderControls'
 import { TypographyPanel } from './TypographyPanel'
 import { useReaderTheme } from './useReaderTheme'
@@ -33,6 +36,7 @@ interface PendingSelection {
 }
 
 const SAVE_DELAY_MS = 1000
+const CONTROLS_HIDE_MS = 4000
 
 const EMPTY_RECT = { left: 0, top: 0, width: 0, height: 0 } as DOMRect
 
@@ -69,6 +73,8 @@ export function ReaderScreen({ bookId, onClose }: ReaderScreenProps) {
   const [pageInfo, setPageInfo] = useState({ page: 1, pages: 1 })
   const [selection, setSelection] = useState<PendingSelection | null>(null)
   const [orphanIds, setOrphanIds] = useState<Set<string>>(new Set())
+  const [zoom, setZoom] = useState(1)
+  const [crop, setCrop] = useState(true)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const clearPaint = useRef<() => void>(() => {})
@@ -115,10 +121,15 @@ export function ReaderScreen({ bookId, onClose }: ReaderScreenProps) {
         created.destroy()
         return
       }
+      created.applyInsets(readSafeInsets(globalThis.document?.documentElement ?? null))
+      await created.resize()
+
       setEngine(created)
       setLocator(created.locate())
       setPercent(created.percent())
       setPageInfo(created.pageInChapter())
+      setZoom(created.getZoom())
+      setCrop(created.getCrop())
     }
 
     void open()
@@ -173,6 +184,27 @@ export function ReaderScreen({ bookId, onClose }: ReaderScreenProps) {
     if (saveTimer.current) clearTimeout(saveTimer.current)
   }, [])
 
+  // ---- a tela do celular muda o tempo todo --------------------------------
+  useEffect(() => {
+    const alvo = containerRef.current
+    if (!engine || !alvo) return
+
+    return observeViewport(alvo, () => {
+      engine.applyInsets(readSafeInsets(globalThis.document?.documentElement ?? null))
+      void engine.resize().then(() => {
+        setPageInfo(engine.pageInChapter())
+        setPercent(engine.percent())
+      })
+    })
+  }, [engine])
+
+  // ---- os controles somem sozinhos ----------------------------------------
+  useEffect(() => {
+    if (!controlsVisible || panel || selection) return
+    const timer = setTimeout(() => setControlsVisible(false), CONTROLS_HIDE_MS)
+    return () => clearTimeout(timer)
+  }, [controlsVisible, panel, selection, locator])
+
   // ---- tema, destaques e foco --------------------------------------------
   useEffect(() => {
     engine?.applyTheme(theme)
@@ -210,6 +242,21 @@ export function ReaderScreen({ bookId, onClose }: ReaderScreenProps) {
     applyFocusMode(root, focus)
     return () => clearFocusMode(root)
   }, [engine, focus, locator.spineIndex, theme])
+
+  const applyZoom = useCallback(
+    async (value: number) => {
+      if (!engine?.canZoom()) return
+      await engine.setZoom(value)
+      setZoom(engine.getZoom())
+    },
+    [engine],
+  )
+
+  const toggleCrop = useCallback(async () => {
+    if (!engine?.canCrop()) return
+    await engine.setCrop(!engine.getCrop())
+    setCrop(engine.getCrop())
+  }, [engine])
 
   // ---- gestos -------------------------------------------------------------
   const readSelection = useCallback(() => {
@@ -277,6 +324,30 @@ export function ReaderScreen({ bookId, onClose }: ReaderScreenProps) {
       }
     }
 
+    const detachSwipe = attachSwipe(doc, {
+      onNext: () => void engine.next(),
+      onPrev: () => void engine.prev(),
+    })
+
+    // Ampliar só faz sentido onde a página tem largura fixa. No EPUB, quem
+    // aumenta a letra é o painel de tipografia.
+    const detachPinch = engine.canZoom()
+      ? attachPinch(doc, {
+          onPreview: (relative) => {
+            const alvo = engine.contentRoot()?.parentElement as HTMLElement | null
+            if (!alvo) return
+            alvo.style.transformOrigin = '0 0'
+            alvo.style.transform = `scale(${relative})`
+          },
+          onCommit: (relative) => {
+            const alvo = engine.contentRoot()?.parentElement as HTMLElement | null
+            if (alvo) alvo.style.transform = ''
+            void applyZoom(engine.getZoom() * relative)
+          },
+          onDoubleTap: () => void applyZoom(engine.getZoom() > 1 ? 1 : 2.5),
+        })
+      : () => {}
+
     doc.addEventListener('mouseup', onPointerUp)
     doc.addEventListener('touchend', onPointerUp)
     doc.addEventListener('click', onClick)
@@ -284,13 +355,15 @@ export function ReaderScreen({ bookId, onClose }: ReaderScreenProps) {
     window.addEventListener('keydown', onKeyDown)
 
     return () => {
+      detachSwipe()
+      detachPinch()
       doc.removeEventListener('mouseup', onPointerUp)
       doc.removeEventListener('touchend', onPointerUp)
       doc.removeEventListener('click', onClick)
       doc.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keydown', onKeyDown)
     }
-  }, [engine, focus.enabled, readSelection, locator.spineIndex])
+  }, [engine, focus.enabled, readSelection, locator.spineIndex, applyZoom])
 
   // ---- anotações ----------------------------------------------------------
   const anchorFromSelection = useCallback((): Anchor | null => {
@@ -386,6 +459,8 @@ export function ReaderScreen({ bookId, onClose }: ReaderScreenProps) {
           percent={percent}
           bookmarked={bookmarked}
           focusEnabled={focus.enabled}
+          zoom={engine?.canZoom() ? { value: zoom, onChange: (v) => void applyZoom(v) } : undefined}
+          crop={engine?.canCrop() ? { enabled: crop, onToggle: () => void toggleCrop() } : undefined}
           onBack={onClose}
           onToggleBookmark={() => void toggleBookmark()}
           onToggleFocus={() => updateFocus({ enabled: !focus.enabled })}

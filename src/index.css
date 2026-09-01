@@ -23,6 +23,13 @@
 /* Paletas de leitura. Servem tanto ao cromo do leitor quanto ao conteúdo
    injetado no iframe — por isso vivem em variáveis, não em classes. */
 :root {
+  /* env() só existe no CSS; expor como variável deixa o leitor consultar o
+     recorte da tela (notch, barra de gestos) e afastar o texto dele. */
+  --quire-safe-top: env(safe-area-inset-top, 0px);
+  --quire-safe-right: env(safe-area-inset-right, 0px);
+  --quire-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --quire-safe-left: env(safe-area-inset-left, 0px);
+
   --paper-bg: #faf8f5;
   --paper-fg: #1c1917;
   --paper-muted: #78716c;

@@ -234,4 +234,54 @@ describe('ReaderScreen', () => {
     await userEvent.click(screen.getByRole('button', { name: /^anotações$/i }))
     expect(await screen.findByText('rio corre')).toBeTruthy()
   })
+
+  it('os controles somem sozinhos para o texto ficar livre', async () => {
+    await seed()
+    await openReader()
+    expect(screen.getByText('Águas do Sertão')).toBeTruthy()
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 4200))
+    })
+
+    expect(screen.queryByText('Águas do Sertão')).toBeNull()
+  })
+
+  it('os controles não somem enquanto um painel está aberto', async () => {
+    await seed()
+    await openReader()
+    await userEvent.click(screen.getByRole('button', { name: /ajustes de leitura/i }))
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 4200))
+    })
+
+    expect(screen.getByRole('button', { name: /ajustes de leitura/i })).toBeTruthy()
+  })
+
+  it('deslizar para a esquerda vira a página', async () => {
+    await seed()
+    await openReader()
+
+    const doc = frame().contentDocument!
+    const toque = (tipo: string, x: number, lista: 'touches' | 'changedTouches') => {
+      const evento = new doc.defaultView!.Event(tipo, { bubbles: true })
+      const outra = lista === 'touches' ? 'changedTouches' : 'touches'
+      Object.defineProperty(evento, lista, { value: [{ clientX: x, clientY: 400 }] })
+      Object.defineProperty(evento, outra, { value: [] })
+      doc.dispatchEvent(evento)
+    }
+
+    toque('touchstart', 320, 'touches')
+    toque('touchend', 80, 'changedTouches')
+
+    await waitFor(() => expect(contentText()).toContain('serra guarda'))
+  })
+
+  it('o EPUB não oferece ampliação — quem aumenta a letra é a tipografia', async () => {
+    await seed()
+    await openReader()
+
+    expect(screen.queryByRole('button', { name: /aumentar amplia\u00e7\u00e3o/i })).toBeNull()
+  })
 })

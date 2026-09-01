@@ -4,6 +4,10 @@ interface ReaderControlsProps {
   percent: number
   bookmarked: boolean
   focusEnabled: boolean
+  /** Ampliação — só aparece em formato de página fixa, como o PDF. */
+  zoom?: { value: number; onChange: (value: number) => void }
+  /** Corte das margens da página, que é o que faz a letra encher a tela. */
+  crop?: { enabled: boolean; onToggle: () => void }
   onBack: () => void
   onToggleBookmark: () => void
   onToggleFocus: () => void
@@ -17,6 +21,8 @@ export function ReaderControls({
   percent,
   bookmarked,
   focusEnabled,
+  zoom,
+  crop,
   onBack,
   onToggleBookmark,
   onToggleFocus,
@@ -76,9 +82,49 @@ export function ReaderControls({
         <div className="mb-1.5 h-0.5 w-full overflow-hidden rounded bg-surface-3">
           <div className="h-full bg-accent transition-[width]" style={{ width: `${percent * 100}%` }} />
         </div>
-        <div className="flex justify-between text-[0.7rem] text-ink-faint">
-          <span>{chapterLabel}</span>
-          <span>{Math.round(percent * 100)}%</span>
+        <div className="flex items-center justify-between gap-2 text-[0.7rem] text-ink-faint">
+          <span className="truncate">{chapterLabel}</span>
+
+          {(zoom || crop) && (
+            <span className="flex shrink-0 items-center gap-1">
+              {crop && (
+                <button
+                  type="button"
+                  onClick={crop.onToggle}
+                  aria-pressed={crop.enabled}
+                  className={`rounded px-1.5 py-0.5 ${crop.enabled ? 'text-accent' : 'text-ink-faint'}`}
+                  title="Cortar as margens da página"
+                >
+                  ⤢ margens
+                </button>
+              )}
+              {zoom && (
+                <>
+                  <button
+                    type="button"
+                    aria-label="Diminuir ampliação"
+                    onClick={() => zoom.onChange(zoom.value - 0.5)}
+                    className="rounded px-1.5 py-0.5 text-ink-dim"
+                  >
+                    −
+                  </button>
+                  <span className="w-9 text-center tabular-nums">
+                    {Math.round(zoom.value * 100)}%
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="Aumentar ampliação"
+                    onClick={() => zoom.onChange(zoom.value + 0.5)}
+                    className="rounded px-1.5 py-0.5 text-ink-dim"
+                  >
+                    +
+                  </button>
+                </>
+              )}
+            </span>
+          )}
+
+          <span className="shrink-0">{Math.round(percent * 100)}%</span>
         </div>
       </footer>
     </>
