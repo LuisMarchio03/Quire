@@ -192,3 +192,43 @@ describe('epubEngine', () => {
     vi.unstubAllGlobals()
   })
 })
+
+describe('epubEngine — mudança de viewport', () => {
+  it('recalcula o layout quando a tela muda de tamanho', async () => {
+    let largura = 800
+    const engine = createEpubEngine(book, { measure: () => ({ width: largura, height: 1000 }) })
+    await engine.mount(container)
+
+    const css = () => iframeOf().contentDocument!.getElementById('quire-theme')!.textContent!
+    expect(css()).toContain('column-width: 680px')
+
+    largura = 390
+    await engine.resize()
+
+    // 390 de largura, margem 28 dos dois lados: a coluna precisa caber em 334.
+    expect(css()).toContain('column-width: 334px')
+  })
+
+  it('mantém o capítulo e a posição relativa depois de girar a tela', async () => {
+    let largura = 390
+    const engine = createEpubEngine(book, { measure: () => ({ width: largura, height: 844 }) })
+    await engine.mount(container)
+    await engine.goTo({ spineIndex: 1, progressInSpine: 0 })
+
+    largura = 844
+    await engine.resize()
+
+    expect(engine.locate().spineIndex).toBe(1)
+    expect(engine.contentRoot()?.textContent).toContain('serra guarda')
+  })
+
+  it('não remonta o iframe ao redimensionar', async () => {
+    const engine = createEpubEngine(book, { measure: () => ({ width: 400, height: 800 }) })
+    await engine.mount(container)
+    const antes = iframeOf()
+
+    await engine.resize()
+
+    expect(iframeOf()).toBe(antes)
+  })
+})

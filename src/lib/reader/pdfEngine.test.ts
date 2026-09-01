@@ -140,3 +140,183 @@ describe('pdfEngine', () => {
     expect(container.querySelector('canvas')).toBeNull()
   })
 })
+
+describe('pdfEngine — tela de celular', () => {
+  const medida = (largura: number, altura = 800) => () => ({ width: largura, height: altura })
+
+  it('desenha a página na largura disponível', async () => {
+    const engine = createPdfEngine(fakeSource(), { measure: medida(390) })
+    await engine.mount(container)
+
+    const canvas = container.querySelector('canvas') as HTMLCanvasElement
+    expect(canvas.style.width).toBe('390px')
+  })
+
+  it('redesenha na nova largura quando a tela gira', async () => {
+    let largura = 390
+    const engine = createPdfEngine(fakeSource(), { measure: () => ({ width: largura, height: 800 }) })
+    await engine.mount(container)
+
+    largura = 844
+    await engine.resize()
+
+    const canvas = container.querySelector('canvas') as HTMLCanvasElement
+    expect(canvas.style.width).toBe('844px')
+    expect(engine.locate().spineIndex).toBe(0)
+  })
+
+  it('girar a tela não muda a página em que se está', async () => {
+    let largura = 390
+    const engine = createPdfEngine(fakeSource(), { measure: () => ({ width: largura, height: 800 }) })
+    await engine.mount(container)
+    await engine.goTo({ spineIndex: 2, progressInSpine: 0 })
+
+    largura = 844
+    await engine.resize()
+
+    expect(engine.locate().spineIndex).toBe(2)
+  })
+
+  it('o PDF admite zoom, e o EPUB não precisa dele', async () => {
+    const engine = createPdfEngine(fakeSource(), { measure: medida(390) })
+    await engine.mount(container)
+
+    expect(engine.canZoom()).toBe(true)
+    expect(engine.getZoom()).toBe(1)
+  })
+
+  it('aumentar o zoom aumenta a página desenhada', async () => {
+    const engine = createPdfEngine(fakeSource(), { measure: medida(390) })
+    await engine.mount(container)
+
+    await engine.setZoom(2)
+
+    const canvas = container.querySelector('canvas') as HTMLCanvasElement
+    expect(canvas.style.width).toBe('780px')
+    expect(engine.getZoom()).toBe(2)
+  })
+
+  it('o zoom fica dentro de limites úteis', async () => {
+    const engine = createPdfEngine(fakeSource(), { measure: medida(390) })
+    await engine.mount(container)
+
+    await engine.setZoom(0.2)
+    expect(engine.getZoom()).toBe(1)
+
+    await engine.setZoom(99)
+    expect(engine.getZoom()).toBe(6)
+  })
+
+  it('o zoom sobrevive à troca de página', async () => {
+    const engine = createPdfEngine(fakeSource(), { measure: medida(390) })
+    await engine.mount(container)
+    await engine.setZoom(3)
+
+    await engine.next()
+
+    expect(engine.getZoom()).toBe(3)
+    const canvas = container.querySelector('canvas') as HTMLCanvasElement
+    expect(canvas.style.width).toBe('1170px')
+  })
+
+  it('as faixas seguras da tela encolhem a área de desenho', async () => {
+    const engine = createPdfEngine(fakeSource(), { measure: medida(390) })
+    await engine.mount(container)
+
+    engine.applyInsets({ top: 47, right: 0, bottom: 34, left: 0 })
+    await engine.resize()
+
+    const canvas = container.querySelector('canvas') as HTMLCanvasElement
+    expect(canvas.style.width).toBe('390px')
+    const wrapper = container.firstElementChild as HTMLElement
+    expect(wrapper.style.paddingTop).toBe('47px')
+    expect(wrapper.style.paddingBottom).toBe('34px')
+  })
+})
+
+describe('pdfEngine — corte das margens', () => {
+  // Página de 600 de largura com texto ocupando 60% dela, a partir de 20%.
+  const caixa = async () => ({ x: 0.2, y: 0.1, w: 0.6, h: 0.8 })
+  const medida = () => ({ width: 390, height: 800 })
+
+  it('encaixa a caixa de texto na largura da tela, e não a folha inteira', async () => {
+    const engine = createPdfEngine(fakeSource(), { measure: medida, detectBox: caixa })
+    await engine.mount(container)
+
+    // 390 / 0,6 = 650: a folha fica maior que a tela, o texto é que cabe nela.
+    const canvas = container.querySelector('canvas') as HTMLCanvasElement
+    expect(canvas.style.width).toBe('650px')
+  })
+
+  it('desloca a folha para o texto encostar na borda', async () => {
+    const engine = createPdfEngine(fakeSource(), { measure: medida, detectBox: caixa })
+    await engine.mount(container)
+
+    const stack = container.querySelector('canvas')!.parentElement as HTMLElement
+    // 650 de largura desenhada × 20% = 130; 867 de altura × 10% = 87.
+    expect(stack.style.marginLeft).toBe('-130px')
+    expect(stack.style.marginTop).toBe('-87px')
+  })
+
+  it('sem corte, a folha inteira cabe na largura', async () => {
+    const engine = createPdfEngine(fakeSource(), {
+      measure: medida,
+      detectBox: caixa,
+      crop: false,
+    })
+    await engine.mount(container)
+
+    const canvas = container.querySelector('canvas') as HTMLCanvasElement
+    expect(canvas.style.width).toBe('390px')
+    expect(engine.getCrop()).toBe(false)
+  })
+
+  it('desligar o corte em tempo de leitura volta à folha inteira', async () => {
+    const engine = createPdfEngine(fakeSource(), { measure: medida, detectBox: caixa })
+    await engine.mount(container)
+
+    await engine.setCrop(false)
+
+    const canvas = container.querySelector('canvas') as HTMLCanvasElement
+    expect(canvas.style.width).toBe('390px')
+    const stack = canvas.parentElement as HTMLElement
+    expect(stack.style.marginLeft).toBe('0px')
+  })
+
+  it('o zoom multiplica em cima do corte', async () => {
+    const engine = createPdfEngine(fakeSource(), { measure: medida, detectBox: caixa })
+    await engine.mount(container)
+
+    await engine.setZoom(2)
+
+    const canvas = container.querySelector('canvas') as HTMLCanvasElement
+    expect(canvas.style.width).toBe('1300px')
+  })
+
+  it('a caixa de cada página é descoberta uma vez só', async () => {
+    const detectBox = vi.fn(caixa)
+    const engine = createPdfEngine(fakeSource(), { measure: medida, detectBox })
+    await engine.mount(container)
+
+    await engine.next()
+    await engine.prev()
+    await engine.setZoom(2)
+
+    // Duas páginas visitadas: duas detecções, apesar das quatro renderizações.
+    expect(detectBox).toHaveBeenCalledTimes(2)
+  })
+
+  it('página que a detecção não entende é desenhada inteira, sem quebrar', async () => {
+    const engine = createPdfEngine(fakeSource(), {
+      measure: medida,
+      detectBox: async () => {
+        throw new Error('sem acesso aos pixels')
+      },
+    })
+    await engine.mount(container)
+
+    const canvas = container.querySelector('canvas') as HTMLCanvasElement
+    expect(canvas.style.width).toBe('390px')
+    expect(engine.contentRoot()?.textContent).toContain('rio corre')
+  })
+})

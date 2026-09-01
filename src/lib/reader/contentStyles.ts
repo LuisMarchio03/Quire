@@ -1,4 +1,4 @@
-import type { ReaderTheme } from './types'
+import { NO_INSETS, type LayoutMetrics, type ReaderTheme, type SafeInsets } from './types'
 
 const FONT_STACKS: Record<ReaderTheme['font'], string> = {
   serif: "'Literata', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif",
@@ -15,21 +15,22 @@ export const PALETTES: Record<ReaderTheme['palette'], { bg: string; fg: string; 
   oled: { bg: '#000000', fg: '#a49d95', muted: '#6b645c' },
 }
 
-export interface LayoutMetrics {
-  width: number
-  height: number
-}
-
 /**
  * A folha injetada no capítulo. Ela faz três coisas: aplica a tipografia
  * escolhida, transforma o texto em colunas do tamanho exato da tela (é o que
  * dá a virada de página), e neutraliza o CSS do próprio livro onde ele
  * atrapalharia — margem de corpo, largura fixa, cor de fundo.
  */
-export function buildContentCss(theme: ReaderTheme, metrics: LayoutMetrics): string {
+export function buildContentCss(
+  theme: ReaderTheme,
+  metrics: LayoutMetrics,
+  insets: SafeInsets = NO_INSETS,
+): string {
   const palette = PALETTES[theme.palette]
   const gap = theme.margin * 2
-  const columnWidth = Math.max(120, metrics.width - gap)
+  // A largura útil desconta os recortes da tela antes de virar coluna.
+  const usableWidth = Math.max(200, metrics.width - insets.left - insets.right)
+  const columnWidth = Math.max(120, usableWidth - gap)
   const contentWidth = theme.maxWidth > 0 ? Math.min(columnWidth, theme.maxWidth) : columnWidth
   const sidePad = theme.margin + (columnWidth - contentWidth) / 2
 
@@ -46,9 +47,11 @@ html, body {
 }
 #quire-viewport {
   position: fixed;
-  inset: 0;
+  inset: ${insets.top}px ${insets.right}px ${insets.bottom}px ${insets.left}px;
   overflow: hidden;
   background: ${palette.bg};
+  /* Sem isto, no celular o duplo toque para virar página vira zoom. */
+  touch-action: manipulation;
 }
 #quire-content {
   height: 100%;
@@ -74,7 +77,7 @@ html, body {
   background-color: transparent !important;
 }
 #quire-content img, #quire-content svg, #quire-content figure {
-  max-height: ${Math.max(120, metrics.height - theme.margin * 4)}px;
+  max-height: ${Math.max(120, metrics.height - insets.top - insets.bottom - theme.margin * 4)}px;
   height: auto;
   object-fit: contain;
   break-inside: avoid;

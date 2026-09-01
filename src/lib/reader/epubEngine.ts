@@ -2,7 +2,23 @@ import type { EpubBook } from '../epub/parseEpub'
 import type { Anchor, Locator } from '../types'
 import { anchorToRange } from '../anchor/anchor'
 import { buildContentCss } from './contentStyles'
-import { DEFAULT_THEME, type ReaderEngine, type ReaderTheme, type SearchHit } from './types'
+import {
+  DEFAULT_THEME,
+  NO_INSETS,
+  type LayoutMetrics,
+  type ReaderEngine,
+  type ReaderTheme,
+  type SafeInsets,
+  type SearchHit,
+} from './types'
+
+export interface EpubEngineOptions {
+  /**
+   * De onde sai o tamanho da área de leitura. Existe para o teste poder
+   * simular telas: jsdom não tem layout, então `clientWidth` é sempre 0.
+   */
+  measure?: () => LayoutMetrics
+}
 
 const THEME_STYLE_ID = 'quire-theme'
 const CONTENT_ID = 'quire-content'
@@ -12,11 +28,12 @@ const VIEWPORT_ID = 'quire-viewport'
 const fold = (text: string) =>
   text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
 
-export function createEpubEngine(book: EpubBook): ReaderEngine {
+export function createEpubEngine(book: EpubBook, options: EpubEngineOptions = {}): ReaderEngine {
   let iframe: HTMLIFrameElement | null = null
   let doc: Document | null = null
   let content: HTMLElement | null = null
   let theme: ReaderTheme = DEFAULT_THEME
+  let insets: SafeInsets = NO_INSETS
 
   let spineIndex = 0
   let page = 0
@@ -111,34 +128,50 @@ export function createEpubEngine(book: EpubBook): ReaderEngine {
 <body><div id="${VIEWPORT_ID}"><div id="${CONTENT_ID}">${body?.innerHTML ?? ''}</div></div></body></html>`
   }
 
-  function metrics() {
-    return {
-      width: iframe?.clientWidth || 800,
-      height: iframe?.clientHeight || 1000,
-    }
+  const metrics: () => LayoutMetrics =
+    options.measure ??
+    (() => ({ width: iframe?.clientWidth || 800, height: iframe?.clientHeight || 1000 }))
+
+  /** Largura de uma página: a coluna mais o vão, ou seja, a área útil da tela. */
+  function step(): number {
+    const { width } = metrics()
+    return Math.max(1, width - insets.left - insets.right)
   }
 
   function writeTheme() {
     const style = doc?.getElementById(THEME_STYLE_ID)
-    if (style) style.textContent = buildContentCss(theme, metrics())
+    if (style) style.textContent = buildContentCss(theme, metrics(), insets)
   }
 
   /** Uma página é uma coluna do tamanho da tela; o total sai da largura do conteúdo. */
   function measurePages(): number {
     if (!content) return 1
-    const step = metrics().width
     const width = content.scrollWidth || 0
-    return Math.max(1, Math.round(width / step) || 1)
+    return Math.max(1, Math.round(width / step()) || 1)
   }
 
   function applyOffset() {
     if (!content) return
-    content.style.transform = `translate3d(${-page * metrics().width}px, 0, 0)`
+    content.style.transform = `translate3d(${-page * step()}px, 0, 0)`
   }
 
   function emit() {
     const locator = engine.locate()
     for (const listener of listeners) listener(locator)
+  }
+
+  /**
+   * Reescreve a folha e remede as colunas mantendo a posição relativa da
+   * leitura. Não remonta o iframe: recarregar o capítulo perderia a seleção,
+   * os destaques pintados e o foco.
+   */
+  function relayout() {
+    if (!content) return
+    const ratio = pages > 1 ? page / (pages - 1) : 0
+    writeTheme()
+    pages = measurePages()
+    page = Math.min(pages - 1, Math.max(0, Math.round(ratio * (pages - 1))))
+    applyOffset()
   }
 
   async function renderChapter(index: number, atEnd: boolean) {
@@ -257,11 +290,28 @@ export function createEpubEngine(book: EpubBook): ReaderEngine {
 
     applyTheme(next) {
       theme = next
-      writeTheme()
-      pages = measurePages()
-      page = Math.min(page, pages - 1)
-      applyOffset()
+      relayout()
     },
+
+    applyInsets(next) {
+      insets = next
+      relayout()
+    },
+
+    async resize() {
+      relayout()
+    },
+
+    // No EPUB o texto reflui: ampliar é aumentar o corpo da fonte, não esticar
+    // a página. Quem faz isso é o painel de tipografia.
+    canZoom: () => false,
+    getZoom: () => 1,
+    async setZoom() {},
+
+    // Não há margem de página para cortar: o texto já é montado na medida da tela.
+    canCrop: () => false,
+    getCrop: () => false,
+    async setCrop() {},
 
     contentRoot: () => content,
 

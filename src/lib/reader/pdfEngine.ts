@@ -1,6 +1,30 @@
 import type { Anchor, Locator } from '../types'
+import { findContentBox, type ContentBox } from './contentBox'
 import { PALETTES } from './contentStyles'
-import { DEFAULT_THEME, type ReaderEngine, type ReaderTheme, type SearchHit } from './types'
+import {
+  DEFAULT_THEME,
+  NO_INSETS,
+  type LayoutMetrics,
+  type ReaderEngine,
+  type ReaderTheme,
+  type SafeInsets,
+  type SearchHit,
+} from './types'
+
+export interface PdfEngineOptions {
+  /** De onde sai o tamanho da área de leitura; o teste substitui por medidas fixas. */
+  measure?: () => LayoutMetrics
+  /** Começa com o corte de margens ligado. */
+  crop?: boolean
+  /**
+   * Como descobrir a caixa de conteúdo da página. O padrão desenha uma prova em
+   * baixa resolução e lê os pixels; o teste injeta uma caixa pronta.
+   */
+  detectBox?: (page: PdfPageLike, base: PdfViewport) => Promise<ContentBox | null>
+}
+
+const MIN_ZOOM = 1
+const MAX_ZOOM = 6
 
 /**
  * Interface mínima do documento PDF de que o motor precisa. Ela existe para
@@ -53,8 +77,13 @@ function multiply(a: number[], b: number[]): number[] {
 
 const INVERTING_PALETTES: ReadonlyArray<ReaderTheme['palette']> = ['dark', 'oled', 'gray']
 
-export function createPdfEngine(source: PdfSource): ReaderEngine {
+export function createPdfEngine(source: PdfSource, options: PdfEngineOptions = {}): ReaderEngine {
   let wrapper: HTMLElement | null = null
+  let insets: SafeInsets = NO_INSETS
+  let zoom = 1
+  let crop = options.crop ?? true
+  let stack: HTMLElement | null = null
+  const boxes = new Map<number, ContentBox | null>()
   let canvas: HTMLCanvasElement | null = null
   let textLayer: HTMLElement | null = null
   let theme: ReaderTheme = DEFAULT_THEME
@@ -67,6 +96,58 @@ export function createPdfEngine(source: PdfSource): ReaderEngine {
   function emit() {
     const locator = engine.locate()
     for (const listener of listeners) listener(locator)
+  }
+
+  const metrics: () => LayoutMetrics =
+    options.measure ??
+    (() => ({ width: wrapper?.clientWidth || 0, height: wrapper?.clientHeight || 0 }))
+
+  /**
+   * Descobre onde está o texto desenhando a página pequena e lendo os pixels.
+   * A prova é barata: um quinto do tamanho basta para achar as margens.
+   */
+  async function defaultDetectBox(page: PdfPageLike, base: PdfViewport): Promise<ContentBox | null> {
+    const probeScale = Math.min(0.3, 400 / Math.max(1, base.width))
+    const viewport = page.getViewport({ scale: probeScale })
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.floor(viewport.width))
+    canvas.height = Math.max(1, Math.floor(viewport.height))
+    const context = canvas.getContext('2d')
+    if (!context) return null
+
+    context.fillStyle = '#ffffff'
+    context.fillRect(0, 0, canvas.width, canvas.height)
+    await page.render({ canvasContext: context, viewport, canvas }).promise
+
+    try {
+      const { data } = context.getImageData(0, 0, canvas.width, canvas.height)
+      return findContentBox(data, canvas.width, canvas.height)
+    } catch {
+      // Alguns ambientes recusam ler os pixels; sem corte a leitura continua.
+      return null
+    }
+  }
+
+  const detectBox = options.detectBox ?? defaultDetectBox
+
+  async function boxFor(pageNumber: number, page: PdfPageLike, base: PdfViewport) {
+    if (!crop) return null
+    if (!boxes.has(pageNumber)) {
+      try {
+        boxes.set(pageNumber, await detectBox(page, base))
+      } catch {
+        boxes.set(pageNumber, null)
+      }
+    }
+    return boxes.get(pageNumber) ?? null
+  }
+
+  function applyInsetPadding() {
+    if (!wrapper) return
+    wrapper.style.paddingTop = `${insets.top}px`
+    wrapper.style.paddingRight = `${insets.right}px`
+    wrapper.style.paddingBottom = `${insets.bottom}px`
+    wrapper.style.paddingLeft = `${insets.left}px`
   }
 
   function applyPalette() {
@@ -112,10 +193,18 @@ export function createPdfEngine(source: PdfSource): ReaderEngine {
     const page = await source.getPage(pageNumber)
     if (token !== renderToken) return
 
-    const available = wrapper?.clientWidth || 0
+    // A largura útil desconta os recortes da tela; o zoom multiplica em cima
+    // disso, e o excedente vira rolagem no contêiner — que é como se arrasta a
+    // página ampliada no celular.
+    const available = Math.max(0, metrics().width - insets.left - insets.right)
     const base = page.getViewport({ scale: 1 })
-    const scale = available > 0 ? available / base.width : 1
-    const viewport = page.getViewport({ scale })
+    const box = await boxFor(pageNumber, page, base)
+    if (token !== renderToken) return
+
+    // Com o corte, quem precisa caber na tela é a caixa do texto, não a folha.
+    // É isso que faz a letra crescer sem ninguém ampliar nada.
+    const fitWidth = available > 0 ? available / (base.width * (box?.w ?? 1)) : 1
+    const viewport = page.getViewport({ scale: fitWidth * zoom })
     const ratio = globalThis.devicePixelRatio || 1
 
     canvas.width = Math.floor(viewport.width * ratio)
@@ -130,6 +219,13 @@ export function createPdfEngine(source: PdfSource): ReaderEngine {
       context.setTransform(ratio, 0, 0, ratio, 0, 0)
       context.clearRect(0, 0, viewport.width, viewport.height)
       await page.render({ canvasContext: context, viewport, canvas }).promise
+    }
+
+    if (stack) {
+      // Desloca a folha para que a caixa de texto encoste na borda; a margem
+      // continua ali, basta arrastar para vê-la.
+      stack.style.marginLeft = box ? `${-Math.round(box.x * viewport.width)}px` : '0px'
+      stack.style.marginTop = box ? `${-Math.round(box.y * viewport.height)}px` : '0px'
     }
 
     const { items } = await page.getTextContent()
@@ -154,7 +250,7 @@ export function createPdfEngine(source: PdfSource): ReaderEngine {
       wrapper.style.cssText =
         'position:relative;width:100%;height:100%;overflow:auto;display:flex;justify-content:center;align-items:flex-start'
 
-      const stack = document.createElement('div')
+      stack = document.createElement('div')
       stack.style.cssText = 'position:relative'
 
       canvas = document.createElement('canvas')
@@ -168,6 +264,7 @@ export function createPdfEngine(source: PdfSource): ReaderEngine {
       stack.append(canvas, textLayer)
       wrapper.append(stack)
       container.append(wrapper)
+      applyInsetPadding()
 
       await renderPage(pageNumber)
     },
@@ -177,6 +274,7 @@ export function createPdfEngine(source: PdfSource): ReaderEngine {
       listeners.clear()
       wrapper?.remove()
       wrapper = null
+      stack = null
       canvas = null
       textLayer = null
     },
@@ -207,6 +305,34 @@ export function createPdfEngine(source: PdfSource): ReaderEngine {
     applyTheme(next) {
       theme = next
       applyPalette()
+    },
+
+    applyInsets(next) {
+      insets = next
+      applyInsetPadding()
+    },
+
+    async resize() {
+      await renderPage(pageNumber)
+    },
+
+    canZoom: () => true,
+    getZoom: () => zoom,
+
+    canCrop: () => true,
+    getCrop: () => crop,
+
+    async setCrop(enabled) {
+      if (enabled === crop) return
+      crop = enabled
+      await renderPage(pageNumber)
+    },
+
+    async setZoom(scale) {
+      const next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Number(scale.toFixed(2))))
+      if (next === zoom) return
+      zoom = next
+      await renderPage(pageNumber)
     },
 
     contentRoot: () => textLayer,
