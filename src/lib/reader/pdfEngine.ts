@@ -29,6 +29,11 @@ export interface PdfEngineOptions {
 
 const MIN_ZOOM = 1
 const MAX_ZOOM = 6
+/**
+ * Respiro lateral, em fração da largura. Cortar a margem da folha até o texto
+ * encostar nas duas bordas da tela é tão ruim de ler quanto não cortar nada.
+ */
+const COMFORT_MARGIN = 0.04
 
 /**
  * Interface mínima do documento PDF de que o motor precisa. Ela existe para
@@ -256,7 +261,9 @@ export function createPdfEngine(source: PdfSource, options: PdfEngineOptions = {
 
     // Com o corte, quem precisa caber na tela é a caixa do texto, não a folha.
     // É isso que faz a letra crescer sem ninguém ampliar nada.
-    const fitWidth = available > 0 ? available / (base.width * (box?.w ?? 1)) : 1
+    // Com corte, parte da largura vira margem; sem corte a folha já traz a dela.
+    const util = box ? available * (1 - COMFORT_MARGIN * 2) : available
+    const fitWidth = util > 0 ? util / (base.width * (box?.w ?? 1)) : 1
     const viewport = page.getViewport({ scale: fitWidth * zoom })
     const ratio = globalThis.devicePixelRatio || 1
 
@@ -310,8 +317,14 @@ export function createPdfEngine(source: PdfSource, options: PdfEngineOptions = {
       // `safe center` centraliza quando cabe e encosta à esquerda quando não
       // cabe — com `center` puro, a parte à esquerda de uma página ampliada
       // fica inalcançável pela rolagem.
+      // `safe center` nos dois eixos: centraliza enquanto couber e encosta na
+      // borda quando não couber — sem isso, ou sobra vão morto embaixo de uma
+      // página curta, ou a parte de cima de uma página ampliada fica
+      // inalcançável pela rolagem.
       wrapper.style.cssText =
-        'position:relative;width:100%;height:100%;overflow:auto;display:flex;align-items:flex-start;justify-content:center;justify-content:safe center'
+        'position:relative;width:100%;height:100%;overflow:auto;display:flex;' +
+        'align-items:center;align-items:safe center;' +
+        'justify-content:center;justify-content:safe center'
 
       stack = document.createElement('div')
       stack.style.cssText = 'position:relative;overflow:hidden;flex:none'

@@ -86,77 +86,78 @@ export function ReaderControls({
         </button>
       </header>
 
-      {/*
-        Setas visíveis nas laterais. As zonas de toque continuam existindo, mas
-        ninguém adivinha que elas existem — e sem isto não há como voltar página
-        no computador a não ser pelo teclado.
-      */}
-      <button
-        type="button"
-        onClick={onPrev}
-        disabled={atStart}
-        aria-label="Página anterior"
-        className="fixed left-2 top-1/2 z-30 grid size-11 -translate-y-1/2 place-items-center rounded-full border border-line/60 bg-canvas/80 text-xl text-ink-dim backdrop-blur transition hover:text-ink disabled:opacity-25"
-      >
-        ‹
-      </button>
-      <button
-        type="button"
-        onClick={onNext}
-        disabled={atEnd}
-        aria-label="Próxima página"
-        className="fixed right-2 top-1/2 z-30 grid size-11 -translate-y-1/2 place-items-center rounded-full border border-line/60 bg-canvas/80 text-xl text-ink-dim backdrop-blur transition hover:text-ink disabled:opacity-25"
-      >
-        ›
-      </button>
-
       <footer className="fixed inset-x-0 bottom-0 z-30 border-t border-line/60 bg-canvas/92 px-4 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur">
         <div className="mb-1.5 h-0.5 w-full overflow-hidden rounded bg-surface-3">
           <div className="h-full bg-accent transition-[width]" style={{ width: `${percent * 100}%` }} />
         </div>
-        <div className="flex items-center justify-between gap-2 text-[0.7rem] text-ink-faint">
-          <span className="truncate">{chapterLabel}</span>
-
-          {(zoom || crop) && (
-            <span className="flex shrink-0 items-center gap-1">
-              {crop && (
+        {(zoom || crop) && (
+          <div className="mb-1.5 flex items-center justify-center gap-1 text-[0.7rem] text-ink-faint">
+            {crop && (
+              <button
+                type="button"
+                onClick={crop.onToggle}
+                aria-pressed={crop.enabled}
+                className={`rounded px-2 py-0.5 ${crop.enabled ? 'text-accent' : 'text-ink-faint'}`}
+                title="Cortar as margens da página"
+              >
+                ⤢ margens
+              </button>
+            )}
+            {zoom && (
+              <>
                 <button
                   type="button"
-                  onClick={crop.onToggle}
-                  aria-pressed={crop.enabled}
-                  className={`rounded px-1.5 py-0.5 ${crop.enabled ? 'text-accent' : 'text-ink-faint'}`}
-                  title="Cortar as margens da página"
+                  aria-label="Diminuir ampliação"
+                  onClick={() => zoom.onChange(zoom.value - 0.5)}
+                  className="rounded px-2 py-0.5 text-ink-dim"
                 >
-                  ⤢ margens
+                  −
                 </button>
-              )}
-              {zoom && (
-                <>
-                  <button
-                    type="button"
-                    aria-label="Diminuir ampliação"
-                    onClick={() => zoom.onChange(zoom.value - 0.5)}
-                    className="rounded px-1.5 py-0.5 text-ink-dim"
-                  >
-                    −
-                  </button>
-                  <span className="w-9 text-center tabular-nums">
-                    {Math.round(zoom.value * 100)}%
-                  </span>
-                  <button
-                    type="button"
-                    aria-label="Aumentar ampliação"
-                    onClick={() => zoom.onChange(zoom.value + 0.5)}
-                    className="rounded px-1.5 py-0.5 text-ink-dim"
-                  >
-                    +
-                  </button>
-                </>
-              )}
-            </span>
-          )}
+                <span className="w-10 text-center tabular-nums">
+                  {Math.round(zoom.value * 100)}%
+                </span>
+                <button
+                  type="button"
+                  aria-label="Aumentar ampliação"
+                  onClick={() => zoom.onChange(zoom.value + 0.5)}
+                  className="rounded px-2 py-0.5 text-ink-dim"
+                >
+                  +
+                </button>
+              </>
+            )}
+          </div>
+        )}
 
-          <span className="shrink-0">{Math.round(percent * 100)}%</span>
+        {/*
+          As setas moram aqui, e não flutuando sobre a página: botão opaco no
+          meio da tela cobre justamente a linha que se está lendo.
+        */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onPrev}
+            disabled={atStart}
+            aria-label="Página anterior"
+            className="grid size-9 shrink-0 place-items-center rounded-lg border border-line text-lg text-ink-dim transition hover:text-ink disabled:opacity-25"
+          >
+            ‹
+          </button>
+
+          <div className="flex min-w-0 flex-1 items-center justify-between gap-2 text-[0.7rem] text-ink-faint">
+            <span className="truncate">{chapterLabel}</span>
+            <span className="shrink-0">{Math.round(percent * 100)}%</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={onNext}
+            disabled={atEnd}
+            aria-label="Próxima página"
+            className="grid size-9 shrink-0 place-items-center rounded-lg border border-line text-lg text-ink-dim transition hover:text-ink disabled:opacity-25"
+          >
+            ›
+          </button>
         </div>
       </footer>
     </>

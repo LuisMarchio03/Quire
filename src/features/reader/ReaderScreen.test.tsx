@@ -377,4 +377,16 @@ describe('ReaderScreen', () => {
     // O ajuste do texto continua sendo outro, e com nome próprio.
     expect(screen.getByRole('button', { name: /aumentar tamanho/i })).toBeTruthy()
   })
+
+  it('as setas ficam no rodapé, nunca por cima do texto', async () => {
+    await seed()
+    await openReader()
+
+    const anterior = screen.getByRole('button', { name: /página anterior/i })
+    const proxima = screen.getByRole('button', { name: /próxima página/i })
+
+    // Botão opaco no meio da tela cobre a linha que se está lendo.
+    expect(anterior.closest('footer')).not.toBeNull()
+    expect(proxima.closest('footer')).not.toBeNull()
+  })
 })
