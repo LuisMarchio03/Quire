@@ -202,8 +202,11 @@ export function createPdfEngine(source: PdfSource, options: PdfEngineOptions = {
     wrapper.style.background = palette.bg
     // O PDF tem página branca gravada; inverter o canvas é o que dá leitura
     // noturna sem mexer no arquivo. A camada de texto fica fora do filtro.
+    // Inverter sozinho transforma a folha branca em preto puro, que é
+    // justamente o pior fundo para ler. Baixar o contraste antes de clarear
+    // deixa a página num cinza-escuro e mantém a letra bem clara.
     canvas.style.filter = INVERTING_PALETTES.includes(theme.palette)
-      ? 'invert(1) hue-rotate(180deg) brightness(0.92)'
+      ? 'invert(1) hue-rotate(180deg) contrast(0.65) sepia(0.14)'
       : ''
   }
 

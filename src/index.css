@@ -1,16 +1,19 @@
 @import 'tailwindcss';
 
 @theme {
-  /* Cromo do app — sempre escuro e quente, para não competir com a página do livro. */
-  --color-canvas: #12100e;
-  --color-surface: #1b1815;
-  --color-surface-2: #24201c;
-  --color-surface-3: #2e2924;
-  --color-line: #332e28;
-  --color-ink: #ece7e0;
-  --color-ink-dim: #a29a90;
-  --color-ink-faint: #6f675e;
-  --color-accent: #d8a45e;
+  /* Cromo do app — escuro e quente, para não competir com a página do livro.
+     Nada de preto puro: texto claro sobre preto chapado passa de 15:1 de
+     contraste, e nesse ponto as letras ganham halo e a vista cansa. Estes tons
+     ficam perto de 11:1, que é o que papel bom faz. */
+  --color-canvas: #191512;
+  --color-surface: #221d18;
+  --color-surface-2: #2a241e;
+  --color-surface-3: #342c24;
+  --color-line: #3b332b;
+  --color-ink: #d0c9be;
+  --color-ink-dim: #a89e90;
+  --color-ink-faint: #8e8274;
+  --color-accent: #dda765;
   --color-accent-dim: #8a6533;
   --color-danger: #d2705c;
 
@@ -36,10 +39,10 @@
   --paper-accent: #a16207;
 }
 
-[data-palette='light'] { --paper-bg: #faf8f5; --paper-fg: #1c1917; --paper-muted: #78716c; --paper-accent: #a16207; }
+[data-palette='light'] { --paper-bg: #faf8f5; --paper-fg: #342f2b; --paper-muted: #7a726a; --paper-accent: #a16207; }
 [data-palette='sepia'] { --paper-bg: #f3e9d6; --paper-fg: #453524; --paper-muted: #857053; --paper-accent: #96601c; }
-[data-palette='gray']  { --paper-bg: #4a4744; --paper-fg: #e8e5e1; --paper-muted: #b3ada6; --paper-accent: #e0b878; }
-[data-palette='dark']  { --paper-bg: #1c1917; --paper-fg: #cec8c1; --paper-muted: #8b837a; --paper-accent: #d8a45e; }
+[data-palette='gray']  { --paper-bg: #46423d; --paper-fg: #eae5dd; --paper-muted: #b6afa5; --paper-accent: #e6bf82; }
+[data-palette='dark']  { --paper-bg: #201c18; --paper-fg: #c4bdb2; --paper-muted: #8d8478; --paper-accent: #dda765; }
 [data-palette='oled']  { --paper-bg: #000000; --paper-fg: #a49d95; --paper-muted: #6b645c; --paper-accent: #bb8c4e; }
 
 html,
@@ -50,7 +53,12 @@ body,
 
 body {
   margin: 0;
-  background: var(--color-canvas);
+  /* Um leve clarear no alto tira o aspecto de chapa; a diferença é pequena de
+     propósito, só o bastante para o fundo deixar de parecer um buraco. */
+  background:
+    radial-gradient(120% 70% at 50% -10%, #241e18 0%, transparent 60%),
+    var(--color-canvas);
+  background-attachment: fixed;
   color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;

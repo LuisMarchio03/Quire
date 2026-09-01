@@ -8,10 +8,10 @@ const FONT_STACKS: Record<ReaderTheme['font'], string> = {
 }
 
 export const PALETTES: Record<ReaderTheme['palette'], { bg: string; fg: string; muted: string }> = {
-  light: { bg: '#faf8f5', fg: '#1c1917', muted: '#78716c' },
+  light: { bg: '#faf8f5', fg: '#342f2b', muted: '#7a726a' },
   sepia: { bg: '#f3e9d6', fg: '#453524', muted: '#857053' },
-  gray: { bg: '#4a4744', fg: '#e8e5e1', muted: '#b3ada6' },
-  dark: { bg: '#1c1917', fg: '#cec8c1', muted: '#8b837a' },
+  gray: { bg: '#46423d', fg: '#eae5dd', muted: '#b6afa5' },
+  dark: { bg: '#201c18', fg: '#c4bdb2', muted: '#8d8478' },
   oled: { bg: '#000000', fg: '#a49d95', muted: '#6b645c' },
 }
 
