@@ -9,6 +9,10 @@ interface ReaderControlsProps {
   /** Corte das margens da página, que é o que faz a letra encher a tela. */
   crop?: { enabled: boolean; onToggle: () => void }
   onBack: () => void
+  onPrev: () => void
+  onNext: () => void
+  atStart: boolean
+  atEnd: boolean
   onToggleBookmark: () => void
   onToggleFocus: () => void
   onOpenTypography: () => void
@@ -24,6 +28,10 @@ export function ReaderControls({
   zoom,
   crop,
   onBack,
+  onPrev,
+  onNext,
+  atStart,
+  atEnd,
   onToggleBookmark,
   onToggleFocus,
   onOpenTypography,
@@ -77,6 +85,30 @@ export function ReaderControls({
           Aa
         </button>
       </header>
+
+      {/*
+        Setas visíveis nas laterais. As zonas de toque continuam existindo, mas
+        ninguém adivinha que elas existem — e sem isto não há como voltar página
+        no computador a não ser pelo teclado.
+      */}
+      <button
+        type="button"
+        onClick={onPrev}
+        disabled={atStart}
+        aria-label="Página anterior"
+        className="fixed left-2 top-1/2 z-30 grid size-11 -translate-y-1/2 place-items-center rounded-full border border-line/60 bg-canvas/80 text-xl text-ink-dim backdrop-blur transition hover:text-ink disabled:opacity-25"
+      >
+        ‹
+      </button>
+      <button
+        type="button"
+        onClick={onNext}
+        disabled={atEnd}
+        aria-label="Próxima página"
+        className="fixed right-2 top-1/2 z-30 grid size-11 -translate-y-1/2 place-items-center rounded-full border border-line/60 bg-canvas/80 text-xl text-ink-dim backdrop-blur transition hover:text-ink disabled:opacity-25"
+      >
+        ›
+      </button>
 
       <footer className="fixed inset-x-0 bottom-0 z-30 border-t border-line/60 bg-canvas/92 px-4 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur">
         <div className="mb-1.5 h-0.5 w-full overflow-hidden rounded bg-surface-3">

@@ -285,4 +285,45 @@ describe('ReaderScreen', () => {
 
     expect(screen.queryByRole('button', { name: /aumentar amplia\u00e7\u00e3o/i })).toBeNull()
   })
+
+  it('há botões visíveis para avançar e voltar página', async () => {
+    await seed()
+    await openReader()
+
+    await userEvent.click(screen.getByRole('button', { name: /próxima página/i }))
+    await waitFor(() => expect(contentText()).toContain('serra guarda'))
+
+    await userEvent.click(screen.getByRole('button', { name: /página anterior/i }))
+    await waitFor(() => expect(contentText()).toContain('rio corre'))
+  })
+
+  it('o botão de voltar fica desativado no começo do livro', async () => {
+    await seed()
+    await openReader()
+
+    expect(screen.getByRole('button', { name: /página anterior/i })).toHaveProperty('disabled', true)
+
+    await userEvent.click(screen.getByRole('button', { name: /próxima página/i }))
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /página anterior/i })).toHaveProperty(
+        'disabled',
+        false,
+      ),
+    )
+  })
+
+  it('o botão de avançar fica desativado no fim do livro', async () => {
+    await seed()
+    await openReader()
+
+    await userEvent.click(screen.getByRole('button', { name: /próxima página/i }))
+    await userEvent.click(screen.getByRole('button', { name: /próxima página/i }))
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /próxima página/i })).toHaveProperty(
+        'disabled',
+        true,
+      ),
+    )
+  })
 })

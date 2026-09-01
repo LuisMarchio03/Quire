@@ -14,7 +14,11 @@ import {
 export interface PdfEngineOptions {
   /** De onde sai o tamanho da área de leitura; o teste substitui por medidas fixas. */
   measure?: () => LayoutMetrics
-  /** Começa com o corte de margens ligado. */
+  /**
+   * Começa com o corte de margens ligado. Sem valor, decide pela largura: num
+   * celular ele é o que torna a letra legível; num computador sobra tela, e
+   * ligá-lo só acrescentaria risco sem ganho.
+   */
   crop?: boolean
   /**
    * Como descobrir a caixa de conteúdo da página. O padrão desenha uma prova em
@@ -81,9 +85,11 @@ export function createPdfEngine(source: PdfSource, options: PdfEngineOptions = {
   let wrapper: HTMLElement | null = null
   let insets: SafeInsets = NO_INSETS
   let zoom = 1
-  let crop = options.crop ?? true
+  const CROP_MAX_WIDTH = 700
+  let crop = options.crop ?? false
+  let cropDecidido = options.crop !== undefined
   let stack: HTMLElement | null = null
-  const boxes = new Map<number, ContentBox | null>()
+  let documentBox: Promise<ContentBox | null> | null = null
   let canvas: HTMLCanvasElement | null = null
   let textLayer: HTMLElement | null = null
   let theme: ReaderTheme = DEFAULT_THEME
@@ -130,16 +136,56 @@ export function createPdfEngine(source: PdfSource, options: PdfEngineOptions = {
 
   const detectBox = options.detectBox ?? defaultDetectBox
 
-  async function boxFor(pageNumber: number, page: PdfPageLike, base: PdfViewport) {
-    if (!crop) return null
-    if (!boxes.has(pageNumber)) {
+  const MIN_BOX_WIDTH = 0.5
+  const MIN_BOX_HEIGHT = 0.3
+  const SAMPLE_PAGES = 5
+
+  /**
+   * Uma caixa para o documento inteiro, e não uma por página.
+   *
+   * Medir página a página seria pior de duas formas: a folha de rosto tem bloco
+   * estreito e ampliaria demais, e cada virada mudaria a escala — ler assim é
+   * como ter alguém mexendo no zoom o tempo todo. Amostrando páginas espalhadas
+   * e unindo as caixas, o resultado é estável e nunca corta conteúdo de nenhuma
+   * delas.
+   */
+  async function computeDocumentBox(): Promise<ContentBox | null> {
+    const total = source.numPages
+    const amostras = Math.min(SAMPLE_PAGES, total)
+    const indices = new Set<number>()
+    for (let i = 0; i < amostras; i++) {
+      indices.add(Math.min(total, Math.max(1, Math.round(((i + 0.5) / amostras) * total))))
+    }
+
+    const encontradas: ContentBox[] = []
+    for (const numero of indices) {
       try {
-        boxes.set(pageNumber, await detectBox(page, base))
+        const page = await source.getPage(numero)
+        const box = await detectBox(page, page.getViewport({ scale: 1 }))
+        if (box) encontradas.push(box)
       } catch {
-        boxes.set(pageNumber, null)
+        // Página ilegível não impede as outras de contribuírem.
       }
     }
-    return boxes.get(pageNumber) ?? null
+    if (encontradas.length === 0) return null
+
+    const x = Math.min(...encontradas.map((b) => b.x))
+    const y = Math.min(...encontradas.map((b) => b.y))
+    const direita = Math.max(...encontradas.map((b) => b.x + b.w))
+    const baixo = Math.max(...encontradas.map((b) => b.y + b.h))
+
+    // Caixa estreita demais amplia demais; o limite prende a ampliação em 2×.
+    const w = Math.min(1, Math.max(MIN_BOX_WIDTH, direita - x))
+    const h = Math.min(1, Math.max(MIN_BOX_HEIGHT, baixo - y))
+    if (w > 0.94 && h > 0.94) return null
+
+    return { x: Math.min(x, 1 - w), y: Math.min(y, 1 - h), w, h }
+  }
+
+  async function boxFor(): Promise<ContentBox | null> {
+    if (!crop) return null
+    documentBox ??= computeDocumentBox().catch(() => null)
+    return documentBox
   }
 
   function applyInsetPadding() {
@@ -197,8 +243,12 @@ export function createPdfEngine(source: PdfSource, options: PdfEngineOptions = {
     // disso, e o excedente vira rolagem no contêiner — que é como se arrasta a
     // página ampliada no celular.
     const available = Math.max(0, metrics().width - insets.left - insets.right)
+    if (!cropDecidido && available > 0) {
+      crop = available < CROP_MAX_WIDTH
+      cropDecidido = true
+    }
     const base = page.getViewport({ scale: 1 })
-    const box = await boxFor(pageNumber, page, base)
+    const box = await boxFor()
     if (token !== renderToken) return
 
     // Com o corte, quem precisa caber na tela é a caixa do texto, não a folha.
@@ -209,23 +259,30 @@ export function createPdfEngine(source: PdfSource, options: PdfEngineOptions = {
 
     canvas.width = Math.floor(viewport.width * ratio)
     canvas.height = Math.floor(viewport.height * ratio)
-    canvas.style.width = `${viewport.width}px`
-    canvas.style.height = `${viewport.height}px`
-    textLayer.style.width = `${viewport.width}px`
-    textLayer.style.height = `${viewport.height}px`
+    canvas.style.width = `${Math.round(viewport.width)}px`
+    canvas.style.height = `${Math.round(viewport.height)}px`
+    textLayer.style.width = `${Math.round(viewport.width)}px`
+    textLayer.style.height = `${Math.round(viewport.height)}px`
+
+    // A janela recorta; a folha desliza por baixo dela. Empurrar a folha com
+    // margem negativa somaria ao alinhamento do contêiner e a jogaria para fora.
+    const recorteX = box ? Math.round(box.x * viewport.width) : 0
+    const recorteY = box ? Math.round(box.y * viewport.height) : 0
+    canvas.style.left = `${-recorteX}px`
+    canvas.style.top = `${-recorteY}px`
+    textLayer.style.left = `${-recorteX}px`
+    textLayer.style.top = `${-recorteY}px`
+
+    if (stack) {
+      stack.style.width = `${Math.round(viewport.width * (box?.w ?? 1))}px`
+      stack.style.height = `${Math.round(viewport.height * (box?.h ?? 1))}px`
+    }
 
     const context = canvas.getContext('2d')
     if (context) {
       context.setTransform(ratio, 0, 0, ratio, 0, 0)
       context.clearRect(0, 0, viewport.width, viewport.height)
       await page.render({ canvasContext: context, viewport, canvas }).promise
-    }
-
-    if (stack) {
-      // Desloca a folha para que a caixa de texto encoste na borda; a margem
-      // continua ali, basta arrastar para vê-la.
-      stack.style.marginLeft = box ? `${-Math.round(box.x * viewport.width)}px` : '0px'
-      stack.style.marginTop = box ? `${-Math.round(box.y * viewport.height)}px` : '0px'
     }
 
     const { items } = await page.getTextContent()
@@ -247,19 +304,22 @@ export function createPdfEngine(source: PdfSource, options: PdfEngineOptions = {
   const engine: ReaderEngine = {
     async mount(container) {
       wrapper = document.createElement('div')
+      // `safe center` centraliza quando cabe e encosta à esquerda quando não
+      // cabe — com `center` puro, a parte à esquerda de uma página ampliada
+      // fica inalcançável pela rolagem.
       wrapper.style.cssText =
-        'position:relative;width:100%;height:100%;overflow:auto;display:flex;justify-content:center;align-items:flex-start'
+        'position:relative;width:100%;height:100%;overflow:auto;display:flex;align-items:flex-start;justify-content:center;justify-content:safe center'
 
       stack = document.createElement('div')
-      stack.style.cssText = 'position:relative'
+      stack.style.cssText = 'position:relative;overflow:hidden;flex:none'
 
       canvas = document.createElement('canvas')
-      canvas.style.cssText = 'display:block;max-width:100%'
+      canvas.style.cssText = 'display:block;position:absolute;left:0;top:0'
 
       textLayer = document.createElement('div')
       textLayer.setAttribute('data-quire-text-layer', '')
       textLayer.style.cssText =
-        'position:absolute;inset:0;overflow:hidden;line-height:1;opacity:1;user-select:text'
+        'position:absolute;left:0;top:0;overflow:hidden;line-height:1;user-select:text'
 
       stack.append(canvas, textLayer)
       wrapper.append(stack)
@@ -323,10 +383,13 @@ export function createPdfEngine(source: PdfSource, options: PdfEngineOptions = {
     getCrop: () => crop,
 
     async setCrop(enabled) {
+      cropDecidido = true
       if (enabled === crop) return
       crop = enabled
       await renderPage(pageNumber)
     },
+
+
 
     async setZoom(scale) {
       const next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Number(scale.toFixed(2))))

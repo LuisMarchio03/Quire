@@ -462,6 +462,12 @@ export function ReaderScreen({ bookId, onClose }: ReaderScreenProps) {
           zoom={engine?.canZoom() ? { value: zoom, onChange: (v) => void applyZoom(v) } : undefined}
           crop={engine?.canCrop() ? { enabled: crop, onToggle: () => void toggleCrop() } : undefined}
           onBack={onClose}
+          onPrev={() => void engine?.prev()}
+          onNext={() => void engine?.next()}
+          atStart={locator.spineIndex === 0 && pageInfo.page === 1}
+          atEnd={
+            engine ? locator.spineIndex === engine.size() - 1 && pageInfo.page === pageInfo.pages : false
+          }
           onToggleBookmark={() => void toggleBookmark()}
           onToggleFocus={() => updateFocus({ enabled: !focus.enabled })}
           onOpenTypography={() => setPanel(panel === 'typography' ? null : 'typography')}
