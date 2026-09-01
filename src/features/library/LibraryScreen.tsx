@@ -1,6 +1,7 @@
 import { useRef, useState, type DragEvent, type ReactNode } from 'react'
 import { useLibrary, type StatusFilter } from './useLibrary'
 import { BookCard } from './BookCard'
+import { TagEditor } from './TagEditor'
 
 const FILTERS: Array<{ value: StatusFilter; label: string }> = [
   { value: 'all', label: 'Todos' },
@@ -29,6 +30,7 @@ export function LibraryScreen({ onOpen, onOpenSettings, statusSlot }: LibraryScr
   const inputRef = useRef<HTMLInputElement>(null)
   const [pendingBookId, setPendingBookId] = useState<string | undefined>()
   const [dragging, setDragging] = useState(false)
+  const [editingTagsFor, setEditingTagsFor] = useState<string | null>(null)
 
   const pickFiles = (bookId?: string) => {
     setPendingBookId(bookId)
@@ -102,6 +104,38 @@ export function LibraryScreen({ onOpen, onOpenSettings, statusSlot }: LibraryScr
             </button>
           )}
         </div>
+        {library.availableTags.length > 0 && (
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-1.5 px-4 pb-2">
+            {library.availableTags.map(({ tag, count }) => {
+              const ativa = library.selectedTags.includes(tag)
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  aria-pressed={ativa}
+                  onClick={() => library.toggleTag(tag)}
+                  className={`rounded-full border px-2.5 py-1 text-xs transition ${
+                    ativa
+                      ? 'border-accent/60 bg-accent/15 text-accent'
+                      : 'border-line text-ink-dim hover:text-ink'
+                  }`}
+                >
+                  {tag} <span className="text-ink-faint">{count}</span>
+                </button>
+              )
+            })}
+            {library.selectedTags.length > 0 && (
+              <button
+                type="button"
+                onClick={library.clearTags}
+                className="px-2 py-1 text-xs text-ink-faint underline underline-offset-2 hover:text-ink-dim"
+              >
+                limpar
+              </button>
+            )}
+          </div>
+        )}
+
         {statusSlot && <div className="mx-auto max-w-6xl px-4 pb-2">{statusSlot}</div>}
       </header>
 
@@ -172,10 +206,28 @@ export function LibraryScreen({ onOpen, onOpenSettings, statusSlot }: LibraryScr
               onAddFile={() => pickFiles(book.id)}
               onRemoveFile={() => void library.removeFile(book.id)}
               onDelete={() => void library.deleteBook(book.id)}
+              onEditTags={() => setEditingTagsFor(book.id)}
             />
           ))}
         </div>
       </main>
+
+      {editingTagsFor &&
+        (() => {
+          const book = library.books.find((b) => b.id === editingTagsFor)
+          if (!book) return null
+          return (
+            <TagEditor
+              book={book}
+              available={library.availableTags}
+              onClose={() => setEditingTagsFor(null)}
+              onSave={(tags) => {
+                setEditingTagsFor(null)
+                void library.setBookTags(book.id, tags)
+              }}
+            />
+          )
+        })()}
 
       {dragging && (
         <div className="pointer-events-none fixed inset-4 z-30 grid place-items-center rounded-2xl border-2 border-dashed border-accent/70 bg-canvas/80 text-accent">

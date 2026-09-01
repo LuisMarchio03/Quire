@@ -10,6 +10,7 @@ interface BookCardProps {
   onAddFile: () => void
   onRemoveFile: () => void
   onDelete: () => void
+  onEditTags: () => void
 }
 
 export function BookCard({
@@ -20,6 +21,7 @@ export function BookCard({
   onAddFile,
   onRemoveFile,
   onDelete,
+  onEditTags,
 }: BookCardProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -139,6 +141,19 @@ export function BookCard({
               type="button"
               onClick={() => {
                 setMenuOpen(false)
+                onEditTags()
+              }}
+              className="block w-full px-3 py-2.5 text-left hover:bg-surface-3"
+            >
+              Etiquetas
+              <span className="block text-xs text-ink-faint">
+                {book.tags.length > 0 ? book.tags.join(', ') : 'nenhuma ainda'}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false)
                 setConfirming(true)
               }}
               className="block w-full px-3 py-2.5 text-left text-danger hover:bg-surface-3"
@@ -204,6 +219,11 @@ export function BookCard({
           {book.author ?? 'Autor desconhecido'}
           {percent > 0 && <span className="text-ink-dim"> · {Math.round(percent * 100)}%</span>}
         </p>
+        {book.tags.length > 0 && (
+          <p className="truncate text-[0.68rem] text-accent/70" title={book.tags.join(', ')}>
+            {book.tags.join(' · ')}
+          </p>
+        )}
       </div>
     </article>
   )

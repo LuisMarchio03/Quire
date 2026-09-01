@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { LibraryScreen } from './LibraryScreen'
 import { localMirror } from '../../lib/store/localMirror'
@@ -259,5 +259,160 @@ describe('LibraryScreen — menu do livro', () => {
 
     expect(screen.queryByRole('dialog')).toBeNull()
     expect((await localMirror.getBook('id-1'))?.deletedAt).toBeNull()
+  })
+})
+
+describe('LibraryScreen — etiquetas', () => {
+  beforeEach(async () => {
+    await deleteQuireDb()
+  })
+
+  const acervo = () => [
+    book({ id: '1', title: 'Grande Sertão: Veredas', tags: ['Ficção', 'Brasil'] }),
+    book({ id: '2', title: 'Vidas Secas', tags: ['Ficção'] }),
+    book({ id: '3', title: 'Clean Architecture', author: 'Robert Martin', tags: ['Técnico'] }),
+  ]
+
+  it('mostra as etiquetas em uso, com quantas vezes aparecem', async () => {
+    await seed(acervo())
+    render(<LibraryScreen onOpen={() => {}} />)
+
+    const ficcao = await screen.findByRole('button', { name: /Ficção 2/ })
+    expect(ficcao).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Brasil 1/ })).toBeTruthy()
+  })
+
+  it('clicar numa etiqueta filtra a estante', async () => {
+    await seed(acervo())
+    render(<LibraryScreen onOpen={() => {}} />)
+
+    await userEvent.click(await screen.findByRole('button', { name: /Técnico 1/ }))
+
+    expect(screen.getByRole('heading', { name: 'Clean Architecture' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Vidas Secas' })).toBeNull()
+  })
+
+  it('duas etiquetas se somam: o filtro estreita', async () => {
+    await seed(acervo())
+    render(<LibraryScreen onOpen={() => {}} />)
+
+    await userEvent.click(await screen.findByRole('button', { name: /Ficção 2/ }))
+    await userEvent.click(screen.getByRole('button', { name: /Brasil 1/ }))
+
+    expect(screen.getByRole('heading', { name: /Grande Sertão/ })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Vidas Secas' })).toBeNull()
+  })
+
+  it('limpar devolve a estante inteira', async () => {
+    await seed(acervo())
+    render(<LibraryScreen onOpen={() => {}} />)
+    await userEvent.click(await screen.findByRole('button', { name: /Técnico 1/ }))
+
+    await userEvent.click(screen.getByRole('button', { name: /limpar/i }))
+
+    expect(screen.getAllByRole('article')).toHaveLength(3)
+  })
+
+  it('a busca por texto também casa etiqueta', async () => {
+    await seed(acervo())
+    render(<LibraryScreen onOpen={() => {}} />)
+    await screen.findByRole('heading', { name: 'Vidas Secas' })
+
+    await userEvent.type(screen.getByRole('searchbox'), 'tecnico')
+
+    expect(screen.getByRole('heading', { name: 'Clean Architecture' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Vidas Secas' })).toBeNull()
+  })
+
+  it('estante sem etiqueta nenhuma não mostra a fileira de fichas', async () => {
+    await seed([book({ id: '1', tags: [] })])
+    render(<LibraryScreen onOpen={() => {}} />)
+
+    await screen.findByRole('heading', { name: /Grande Sertão/ })
+    expect(screen.queryByRole('button', { name: /limpar/i })).toBeNull()
+  })
+
+  it('o menu do livro abre o editor de etiquetas', async () => {
+    await seed(acervo())
+    render(<LibraryScreen onOpen={() => {}} />)
+
+    await userEvent.click(await screen.findByRole('button', { name: /opções de grande sertão/i }))
+    await userEvent.click(screen.getByRole('button', { name: /etiquetas/i }))
+
+    const dialogo = await screen.findByRole('dialog')
+    expect(dialogo.textContent).toContain('Ficção')
+  })
+
+  it('acrescentar uma etiqueta e salvar leva ela para a estante', async () => {
+    await seed(acervo())
+    render(<LibraryScreen onOpen={() => {}} />)
+    await userEvent.click(await screen.findByRole('button', { name: /opções de vidas secas/i }))
+    await userEvent.click(screen.getByRole('button', { name: /etiquetas/i }))
+
+    const dialogo = await screen.findByRole('dialog')
+    await userEvent.type(within(dialogo).getByLabelText(/nova etiqueta/i), 'Nordeste')
+    await userEvent.click(within(dialogo).getByRole('button', { name: /adicionar/i }))
+    await userEvent.click(within(dialogo).getByRole('button', { name: /salvar/i }))
+
+    expect(await screen.findByRole('button', { name: /Nordeste 1/ })).toBeTruthy()
+    expect((await localMirror.getBook('2'))?.tags).toEqual(['Ficção', 'Nordeste'])
+  })
+
+  it('remover uma etiqueta no editor tira ela do livro', async () => {
+    await seed(acervo())
+    render(<LibraryScreen onOpen={() => {}} />)
+    await userEvent.click(await screen.findByRole('button', { name: /opções de grande sertão/i }))
+    await userEvent.click(screen.getByRole('button', { name: /etiquetas/i }))
+
+    await userEvent.click(screen.getByRole('button', { name: /remover etiqueta brasil/i }))
+    await userEvent.click(screen.getByRole('button', { name: /salvar/i }))
+
+    await waitFor(async () => expect((await localMirror.getBook('1'))?.tags).toEqual(['Ficção']))
+  })
+
+  it('cancelar não altera nada', async () => {
+    await seed(acervo())
+    render(<LibraryScreen onOpen={() => {}} />)
+    await userEvent.click(await screen.findByRole('button', { name: /opções de grande sertão/i }))
+    await userEvent.click(screen.getByRole('button', { name: /etiquetas/i }))
+
+    await userEvent.click(screen.getByLabelText(/nova etiqueta/i))
+    await userEvent.paste('Descartar')
+    await userEvent.click(screen.getByRole('button', { name: /cancelar/i }))
+
+    expect((await localMirror.getBook('1'))?.tags).toEqual(['Ficção', 'Brasil'])
+  })
+
+  it('o editor sugere etiquetas já usadas no acervo', async () => {
+    await seed(acervo())
+    render(<LibraryScreen onOpen={() => {}} />)
+    await userEvent.click(await screen.findByRole('button', { name: /opções de clean architecture/i }))
+    await userEvent.click(screen.getByRole('button', { name: /etiquetas/i }))
+
+    const dialogo = await screen.findByRole('dialog')
+    expect(dialogo.textContent).toContain('Já usadas no acervo')
+
+    // Sugere as que o livro ainda não tem, e não a que ele já tem.
+    await userEvent.click(within(dialogo).getByRole('button', { name: /^Ficção 2$/ }))
+    expect(within(dialogo).queryByRole('button', { name: /^Técnico 1$/ })).toBeNull()
+    await userEvent.click(within(dialogo).getByRole('button', { name: /salvar/i }))
+
+    await waitFor(async () =>
+      expect((await localMirror.getBook('3'))?.tags).toEqual(['Ficção', 'Técnico']),
+    )
+  })
+
+  it('etiqueta repetida com acento diferente não duplica', async () => {
+    await seed([book({ id: '1', tags: ['Ficção'] })])
+    render(<LibraryScreen onOpen={() => {}} />)
+    await userEvent.click(await screen.findByRole('button', { name: /opções de grande sertão/i }))
+    await userEvent.click(screen.getByRole('button', { name: /etiquetas/i }))
+
+    const dialogo = await screen.findByRole('dialog')
+    await userEvent.type(within(dialogo).getByLabelText(/nova etiqueta/i), 'ficcao')
+    await userEvent.click(within(dialogo).getByRole('button', { name: /adicionar/i }))
+    await userEvent.click(within(dialogo).getByRole('button', { name: /salvar/i }))
+
+    await waitFor(async () => expect((await localMirror.getBook('1'))?.tags).toEqual(['Ficção']))
   })
 })

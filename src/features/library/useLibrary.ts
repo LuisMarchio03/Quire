@@ -4,6 +4,7 @@ import { createBookStore } from '../../lib/store/bookStore'
 import { localMirror } from '../../lib/store/localMirror'
 import { nowIso } from '../../lib/time'
 import type { Book, BookStatus } from '../../lib/types'
+import { collectTags, filterBooks, normalizeTags } from '../../lib/library/tags'
 
 export type StatusFilter = 'all' | BookStatus
 
@@ -13,10 +14,6 @@ export interface ImportingState {
   fraction: number
 }
 
-/** Tira acento e caixa para a busca casar "sertao" com "Sertão". */
-const fold = (text: string) =>
-  text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
-
 export function useLibrary() {
   const store = useMemo(() => createBookStore(), [])
   const [books, setBooks] = useState<Book[]>([])
@@ -25,6 +22,7 @@ export function useLibrary() {
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [importing, setImporting] = useState<ImportingState | null>(null)
   const [message, setMessage] = useState<string | null>(null)
 
@@ -91,14 +89,33 @@ export function useLibrary() {
     [refresh, store],
   )
 
-  const visible = useMemo(() => {
-    const needle = fold(query.trim())
-    return books.filter((book) => {
-      if (statusFilter !== 'all' && book.status !== statusFilter) return false
-      if (!needle) return true
-      return fold(`${book.title} ${book.author ?? ''}`).includes(needle)
-    })
-  }, [books, query, statusFilter])
+  const visible = useMemo(
+    () => filterBooks(books, { query, tags: selectedTags, status: statusFilter }),
+    [books, query, selectedTags, statusFilter],
+  )
+
+  /** As etiquetas em uso, para virarem fichas clicáveis na estante. */
+  const availableTags = useMemo(() => collectTags(books), [books])
+
+  const toggleTag = useCallback((tag: string) => {
+    setSelectedTags((current) =>
+      current.includes(tag) ? current.filter((t) => t !== tag) : [...current, tag],
+    )
+  }, [])
+
+  const setBookTags = useCallback(
+    async (bookId: string, tags: readonly string[]) => {
+      const book = await localMirror.getBook(bookId)
+      if (!book) return
+      await localMirror.saveBook({
+        ...book,
+        tags: normalizeTags(tags),
+        updatedAt: nowIso(),
+      })
+      await refresh()
+    },
+    [refresh],
+  )
 
   return {
     books,
@@ -110,6 +127,11 @@ export function useLibrary() {
     setQuery,
     statusFilter,
     setStatusFilter,
+    availableTags,
+    selectedTags,
+    toggleTag,
+    clearTags: useCallback(() => setSelectedTags([]), []),
+    setBookTags,
     importing,
     message,
     dismissMessage: () => setMessage(null),
