@@ -4,12 +4,16 @@
   /* Cromo do app — escuro e quente, para não competir com a página do livro.
      Nada de preto puro: texto claro sobre preto chapado passa de 15:1 de
      contraste, e nesse ponto as letras ganham halo e a vista cansa. Estes tons
-     ficam perto de 11:1, que é o que papel bom faz. */
+     ficam perto de 11:1, que é o que papel bom faz.
+
+     Uma cor de fundo, uma de superfície para o que se destaca (campos, folhas
+     inferiores), e fios discretos no lugar de caixas: o que separa as coisas é
+     espaço, não borda. */
   --color-canvas: #191512;
   --color-surface: #221d18;
   --color-surface-2: #2a241e;
   --color-surface-3: #342c24;
-  --color-line: #3b332b;
+  --color-line: #2e2721;
   --color-ink: #d0c9be;
   --color-ink-dim: #a89e90;
   --color-ink-faint: #8e8274;
@@ -17,10 +21,15 @@
   --color-accent-dim: #8a6533;
   --color-danger: #d2705c;
 
-  --font-sans: 'Inter var', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-serif: 'Literata', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  /* A interface usa a fonte do aparelho; a Literata, embutida, é para o que é
+     livro: marca, títulos e o texto em leitura (ver src/lib/reader/fonts.ts). */
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  --font-serif: 'Literata Variable', 'Literata', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
 
-  --radius-card: 0.75rem;
+  --radius-card: 0.375rem;
+  --shadow-cover: 0 10px 22px -12px rgb(0 0 0 / 0.9), inset 0 0 0 1px rgb(255 255 255 / 0.04);
+  --shadow-sheet: 0 -20px 40px -20px rgb(0 0 0 / 0.7);
+  --shadow-pop: 0 18px 40px -16px rgb(0 0 0 / 0.8);
 }
 
 /* Paletas de leitura. Servem tanto ao cromo do leitor quanto ao conteúdo
@@ -53,12 +62,7 @@ body,
 
 body {
   margin: 0;
-  /* Um leve clarear no alto tira o aspecto de chapa; a diferença é pequena de
-     propósito, só o bastante para o fundo deixar de parecer um buraco. */
-  background:
-    radial-gradient(120% 70% at 50% -10%, #241e18 0%, transparent 60%),
-    var(--color-canvas);
-  background-attachment: fixed;
+  background: var(--color-canvas);
   color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
@@ -72,6 +76,42 @@ body {
 
 ::selection {
   background: color-mix(in srgb, var(--color-accent) 35%, transparent);
+}
+
+/* Interruptor: a caixa de marcação nativa varia de aparelho para aparelho e
+   destoa do resto; este é o mesmo em todos. */
+.switch {
+  appearance: none;
+  width: 2.375rem;
+  height: 1.375rem;
+  border-radius: 999px;
+  background: var(--color-surface-3);
+  position: relative;
+  cursor: pointer;
+  transition: background 150ms;
+  flex: none;
+}
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 0.1875rem;
+  left: 0.1875rem;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: var(--color-ink-faint);
+  transition: transform 150ms, background 150ms;
+}
+.switch:checked {
+  background: var(--color-accent);
+}
+.switch:checked::after {
+  transform: translateX(1rem);
+  background: var(--color-canvas);
+}
+.switch:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {

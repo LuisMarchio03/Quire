@@ -7,6 +7,9 @@ interface LoginScreenProps {
   onLocalOnly: () => void
 }
 
+const field =
+  'mt-1.5 w-full rounded-xl bg-surface px-3.5 py-2.5 text-ink placeholder:text-ink-faint focus:outline-none focus:ring-1 focus:ring-accent/40'
+
 export function LoginScreen({ onLogin, onPair, onLocalOnly }: LoginScreenProps) {
   const [mode, setMode] = useState<'password' | 'code'>('password')
   const [password, setPassword] = useState('')
@@ -30,14 +33,14 @@ export function LoginScreen({ onLogin, onPair, onLocalOnly }: LoginScreenProps) 
   }
 
   return (
-    <main className="grid min-h-full place-items-center px-5 py-12">
+    <main className="grid min-h-full place-items-center px-6 py-12">
       <div className="w-full max-w-sm">
-        <h1 className="font-serif text-4xl text-accent">Quire</h1>
+        <h1 className="font-serif text-[2.5rem] font-medium tracking-tight text-accent">Quire</h1>
         <p className="mt-1 text-sm text-ink-dim">Seu acervo, lido do seu jeito.</p>
 
-        <form onSubmit={submit} className="mt-8 space-y-3">
+        <form onSubmit={submit} className="mt-10 space-y-4">
           {mode === 'password' ? (
-            <label className="block text-sm text-ink-dim">
+            <label className="block text-xs uppercase tracking-[0.12em] text-ink-faint">
               Senha
               <input
                 type="password"
@@ -45,11 +48,11 @@ export function LoginScreen({ onLogin, onPair, onLocalOnly }: LoginScreenProps) 
                 required
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-ink focus:border-accent/60 focus:outline-none"
+                className={`${field} text-base tracking-normal normal-case`}
               />
             </label>
           ) : (
-            <label className="block text-sm text-ink-dim">
+            <label className="block text-xs uppercase tracking-[0.12em] text-ink-faint">
               Código de pareamento
               <input
                 inputMode="numeric"
@@ -59,17 +62,17 @@ export function LoginScreen({ onLogin, onPair, onLocalOnly }: LoginScreenProps) 
                 placeholder="000000"
                 value={code}
                 onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-center font-mono text-2xl tracking-[0.4em] text-ink focus:border-accent/60 focus:outline-none"
+                className={`${field} text-center font-serif text-3xl tracking-[0.4em] normal-case`}
               />
             </label>
           )}
 
-          <label className="block text-sm text-ink-dim">
+          <label className="block text-xs uppercase tracking-[0.12em] text-ink-faint">
             Nome deste aparelho
             <input
               value={deviceName}
               onChange={(event) => setDeviceName(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-ink focus:border-accent/60 focus:outline-none"
+              className={`${field} text-base tracking-normal normal-case`}
             />
           </label>
 
@@ -82,23 +85,21 @@ export function LoginScreen({ onLogin, onPair, onLocalOnly }: LoginScreenProps) 
           <button
             type="submit"
             disabled={busy}
-            className="w-full rounded-lg bg-accent py-2 font-medium text-canvas disabled:opacity-50"
+            className="w-full rounded-xl bg-accent py-2.5 font-medium text-canvas disabled:opacity-50"
           >
             {busy ? 'Entrando…' : 'Entrar'}
           </button>
         </form>
 
-        <div className="mt-6 space-y-2 text-sm">
+        <div className="mt-8 space-y-2 text-sm">
           <button
             type="button"
             onClick={() => setMode(mode === 'password' ? 'code' : 'password')}
             className="text-accent underline underline-offset-2"
           >
-            {mode === 'password'
-              ? 'Entrar com código de pareamento'
-              : 'Entrar com a senha'}
+            {mode === 'password' ? 'Entrar com código de pareamento' : 'Entrar com a senha'}
           </button>
-          <p className="text-ink-faint">
+          <p className="leading-relaxed text-ink-faint">
             No computador já autenticado, abra Ajustes → Parear aparelho para gerar um código.
           </p>
         </div>
@@ -106,7 +107,7 @@ export function LoginScreen({ onLogin, onPair, onLocalOnly }: LoginScreenProps) 
         <button
           type="button"
           onClick={onLocalOnly}
-          className="mt-8 text-sm text-ink-faint underline underline-offset-2 hover:text-ink-dim"
+          className="mt-10 text-sm text-ink-faint underline underline-offset-2 hover:text-ink-dim"
         >
           Usar só neste aparelho, sem sincronizar
         </button>

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Annotation, Book } from '../../lib/types'
 import type { SearchHit } from '../../lib/reader/types'
+import { Icon } from '../ui/Icon'
 import { exportMarkdown } from './exportMarkdown'
 
 interface AnnotationsPanelProps {
@@ -16,6 +17,11 @@ interface AnnotationsPanelProps {
 }
 
 type Tab = 'marks' | 'search'
+
+const tabClass = (active: boolean) =>
+  `border-b-[1.5px] px-1 pb-2 pt-1 text-sm transition ${
+    active ? 'border-accent text-ink' : 'border-transparent text-ink-faint hover:text-ink-dim'
+  }`
 
 export function AnnotationsPanel({
   book,
@@ -61,48 +67,47 @@ export function AnnotationsPanel({
   return (
     <aside
       aria-label="Anotações do livro"
-      className="fixed inset-y-0 right-0 z-40 flex w-full max-w-sm flex-col border-l border-line bg-surface shadow-2xl"
+      className="fixed inset-y-0 right-0 z-40 flex w-full max-w-sm flex-col bg-surface shadow-pop"
     >
-      <header className="flex items-center gap-2 border-b border-line px-4 py-3">
-        <div className="flex flex-1 gap-1">
-          <button
-            type="button"
-            onClick={() => setTab('marks')}
-            className={`rounded-full px-3 py-1 text-xs ${tab === 'marks' ? 'bg-accent/15 text-accent' : 'text-ink-dim'}`}
-          >
+      <header className="flex items-center gap-4 px-5 pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <div className="flex flex-1 gap-4">
+          <button type="button" onClick={() => setTab('marks')} className={tabClass(tab === 'marks')}>
             Anotações
           </button>
-          <button
-            type="button"
-            onClick={() => setTab('search')}
-            className={`rounded-full px-3 py-1 text-xs ${tab === 'search' ? 'bg-accent/15 text-accent' : 'text-ink-dim'}`}
-          >
+          <button type="button" onClick={() => setTab('search')} className={tabClass(tab === 'search')}>
             Buscar
           </button>
         </div>
-        <button type="button" onClick={onClose} aria-label="Fechar anotações" className="text-ink-dim hover:text-ink">
-          ✕
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Fechar anotações"
+          className="grid size-9 place-items-center rounded-xl text-ink-dim hover:text-ink"
+        >
+          <Icon name="close" />
         </button>
       </header>
 
       {tab === 'marks' ? (
-        <div className="flex-1 overflow-y-auto px-4 py-3">
+        <div className="flex-1 overflow-y-auto px-5 py-4">
           {annotations.length === 0 && (
-            <p className="py-10 text-center text-sm text-ink-faint">
+            <p className="py-12 text-center text-sm text-ink-faint">
               Selecione um trecho no texto para destacar ou anotar.
             </p>
           )}
 
           {bookmarks.length > 0 && (
             <>
-              <h3 className="mb-2 text-xs uppercase tracking-wide text-ink-faint">Marcas de página</h3>
-              <ul className="mb-5 space-y-1">
+              <h3 className="mb-1 text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">
+                Marcas de página
+              </h3>
+              <ul className="mb-6 divide-y divide-line">
                 {bookmarks.map((bookmark) => (
                   <li key={bookmark.id} className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => onJump(bookmark)}
-                      className="flex-1 truncate rounded px-2 py-1 text-left text-sm text-ink-dim hover:bg-surface-2 hover:text-ink"
+                      className="flex-1 truncate py-2.5 text-left text-sm text-ink-dim hover:text-ink"
                     >
                       {bookmark.quotedText || 'Marca'}
                     </button>
@@ -110,9 +115,9 @@ export function AnnotationsPanel({
                       type="button"
                       onClick={() => onRemove(bookmark.id)}
                       aria-label="Remover marca"
-                      className="text-ink-faint hover:text-danger"
+                      className="grid size-8 place-items-center rounded-lg text-ink-faint hover:text-danger"
                     >
-                      ✕
+                      <Icon name="close" size={16} />
                     </button>
                   </li>
                 ))}
@@ -121,19 +126,19 @@ export function AnnotationsPanel({
           )}
 
           {passages.length > 0 && (
-            <h3 className="mb-2 text-xs uppercase tracking-wide text-ink-faint">Trechos</h3>
+            <h3 className="mb-2 text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">Trechos</h3>
           )}
-          <ul className="space-y-3">
+          <ul className="space-y-4">
             {passages.map((annotation) => (
               <li
                 key={annotation.id}
-                className="rounded-lg border border-line bg-surface-2 p-3"
-                style={{ borderLeft: `3px solid ${annotation.color ?? '#e8c468'}` }}
+                className="pl-3"
+                style={{ borderLeft: `2px solid ${annotation.color ?? '#e8c468'}` }}
               >
                 <button
                   type="button"
                   onClick={() => onJump(annotation)}
-                  className="block w-full text-left font-serif text-sm text-ink"
+                  className="block w-full text-left font-serif text-[0.9375rem] leading-snug text-ink"
                 >
                   {annotation.quotedText || '(trecho sem texto)'}
                 </button>
@@ -151,34 +156,34 @@ export function AnnotationsPanel({
                       value={draft}
                       onChange={(event) => setDraft(event.target.value)}
                       rows={3}
-                      className="w-full rounded border border-line bg-surface px-2 py-1 text-sm text-ink focus:outline-none"
+                      className="w-full rounded-lg bg-surface-2 px-3 py-2 text-sm text-ink focus:outline-none"
                     />
-                    <div className="mt-1 flex gap-2">
+                    <div className="mt-1.5 flex gap-2">
                       <button
                         type="button"
                         onClick={() => {
                           onEditNote(annotation.id, draft.trim())
                           setEditing(null)
                         }}
-                        className="rounded bg-accent px-2 py-1 text-xs text-canvas"
+                        className="rounded-lg bg-accent px-3 py-1 text-xs font-medium text-canvas"
                       >
                         Salvar
                       </button>
                       <button
                         type="button"
                         onClick={() => setEditing(null)}
-                        className="rounded px-2 py-1 text-xs text-ink-dim"
+                        className="rounded-lg px-2 py-1 text-xs text-ink-dim"
                       >
                         Cancelar
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <div className="mt-2 flex items-start justify-between gap-2">
+                  <div className="mt-1.5 flex items-start justify-between gap-2">
                     <p className="flex-1 whitespace-pre-wrap text-xs text-ink-dim">
                       {annotation.noteText}
                     </p>
-                    <div className="flex shrink-0 gap-2">
+                    <div className="flex shrink-0 gap-3">
                       <button
                         type="button"
                         onClick={() => {
@@ -204,7 +209,7 @@ export function AnnotationsPanel({
           </ul>
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto px-4 py-3">
+        <div className="flex-1 overflow-y-auto px-5 py-4">
           <form onSubmit={runSearch} className="flex gap-2">
             <input
               type="search"
@@ -212,9 +217,12 @@ export function AnnotationsPanel({
               placeholder="Buscar no livro"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              className="flex-1 rounded-lg border border-line bg-surface-2 px-3 py-1.5 text-sm text-ink focus:outline-none"
+              className="min-w-0 flex-1 rounded-xl bg-surface-2 px-3.5 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none"
             />
-            <button type="submit" className="rounded-lg bg-accent px-3 text-sm text-canvas">
+            <button
+              type="submit"
+              className="rounded-xl bg-accent px-3.5 text-sm font-medium text-canvas"
+            >
               Ir
             </button>
           </form>
@@ -224,13 +232,13 @@ export function AnnotationsPanel({
             <p className="mt-4 text-sm text-ink-faint">Nada encontrado.</p>
           )}
 
-          <ul className="mt-4 space-y-2">
+          <ul className="mt-3 divide-y divide-line">
             {hits?.map((hit, index) => (
               <li key={`${hit.locator.spineIndex}-${index}`}>
                 <button
                   type="button"
                   onClick={() => onJumpToHit(hit)}
-                  className="w-full rounded-lg border border-line bg-surface-2 p-2 text-left text-xs text-ink-dim hover:text-ink"
+                  className="w-full py-2.5 text-left text-xs leading-relaxed text-ink-dim hover:text-ink"
                 >
                   …{hit.excerpt}…
                 </button>
@@ -240,12 +248,12 @@ export function AnnotationsPanel({
         </div>
       )}
 
-      <footer className="border-t border-line px-4 py-3">
+      <footer className="px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2">
         <button
           type="button"
           onClick={download}
           disabled={annotations.length === 0}
-          className="w-full rounded-lg border border-line py-2 text-sm text-ink-dim hover:text-ink disabled:opacity-40"
+          className="w-full rounded-xl bg-surface-2 py-2.5 text-sm text-ink-dim hover:text-ink disabled:opacity-40"
         >
           Exportar em Markdown
         </button>

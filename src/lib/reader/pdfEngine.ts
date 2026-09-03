@@ -1,6 +1,6 @@
 import type { Anchor, Locator } from '../types'
 import { findContentBox, type ContentBox } from './contentBox'
-import { PALETTES } from './contentStyles'
+import { PALETTES, pdfPagePaint } from './contentStyles'
 import {
   DEFAULT_THEME,
   NO_INSETS,
@@ -83,8 +83,6 @@ function multiply(a: number[], b: number[]): number[] {
     a[1] * b[4] + a[3] * b[5] + a[5],
   ]
 }
-
-const INVERTING_PALETTES: ReadonlyArray<ReaderTheme['palette']> = ['dark', 'oled', 'gray']
 
 export function createPdfEngine(source: PdfSource, options: PdfEngineOptions = {}): ReaderEngine {
   let wrapper: HTMLElement | null = null
@@ -202,17 +200,19 @@ export function createPdfEngine(source: PdfSource, options: PdfEngineOptions = {
   }
 
   function applyPalette() {
-    if (!wrapper || !canvas) return
+    if (!wrapper || !canvas || !stack) return
     const palette = PALETTES[theme.palette]
     wrapper.style.background = palette.bg
-    // O PDF tem página branca gravada; inverter o canvas é o que dá leitura
-    // noturna sem mexer no arquivo. A camada de texto fica fora do filtro.
-    // Inverter sozinho transforma a folha branca em preto puro, que é
-    // justamente o pior fundo para ler. Baixar o contraste antes de clarear
-    // deixa a página num cinza-escuro e mantém a letra bem clara.
-    canvas.style.filter = INVERTING_PALETTES.includes(theme.palette)
-      ? 'invert(1) hue-rotate(180deg) contrast(0.65) sepia(0.14)'
-      : ''
+    // A folha branca do PDF é fundida com o papel da paleta (ver
+    // `pdfPagePaint`): o branco vira exatamente o fundo, e a página deixa de
+    // ser um bloco de outra cor no meio do leitor. `isolation` prende a fusão
+    // ao próprio bloco. A camada de texto fica fora de tudo isso.
+    stack.style.background = palette.bg
+    stack.style.setProperty('isolation', 'isolate')
+    const paint = pdfPagePaint(theme.palette)
+    canvas.style.filter = paint.filter
+    canvas.style.setProperty('mix-blend-mode', paint.blend)
+    canvas.style.opacity = String(paint.opacity)
   }
 
   function paintTextLayer(items: PdfTextItem[], viewport: PdfViewport) {

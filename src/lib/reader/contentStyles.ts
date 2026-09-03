@@ -1,8 +1,9 @@
+import { READER_FONT_FACES, SERIF_STACK } from './fonts'
 import { NO_INSETS, type LayoutMetrics, type ReaderTheme, type SafeInsets } from './types'
 
 const FONT_STACKS: Record<ReaderTheme['font'], string> = {
-  serif: "'Literata', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif",
-  sans: "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+  serif: SERIF_STACK,
+  sans: "system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif",
   // OpenDyslexic se estiver instalada; o espaçamento largo abaixo ajuda mesmo sem ela.
   easy: "'OpenDyslexic', 'Atkinson Hyperlegible', Verdana, sans-serif",
 }
@@ -13,6 +14,52 @@ export const PALETTES: Record<ReaderTheme['palette'], { bg: string; fg: string; 
   gray: { bg: '#46423d', fg: '#eae5dd', muted: '#b6afa5' },
   dark: { bg: '#201c18', fg: '#c4bdb2', muted: '#8d8478' },
   oled: { bg: '#000000', fg: '#a49d95', muted: '#6b645c' },
+}
+
+const DARK_PALETTES: ReadonlyArray<ReaderTheme['palette']> = ['dark', 'oled', 'gray']
+
+/** Luminância em sRGB, sem linearizar: é nesse espaço que filtro e blend do CSS trabalham. */
+function srgbLuminance(hex: string): number {
+  const channel = (at: number) => Number.parseInt(hex.slice(at, at + 2), 16) / 255
+  return 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5)
+}
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
+
+export interface PdfPagePaint {
+  filter: string
+  blend: 'screen' | 'multiply'
+  opacity: number
+}
+
+/**
+ * Como pintar a folha do PDF com o papel e a tinta da paleta sem tocar nos
+ * pixels — e sem que ela vire um bloco cinza sobre o fundo.
+ *
+ * O PDF traz página branca e letra preta gravadas. Nas paletas escuras a folha
+ * é invertida e fundida por `screen` sobre o papel da paleta: preto sob screen
+ * devolve o fundo exato, então a folha some; a opacidade abaixa a letra branca
+ * até a luminância da tinta. Nas claras a folha é fundida por `multiply`:
+ * branco sob multiply devolve o fundo exato, e a opacidade sobe a letra preta
+ * até a tinta. O sépia no filtro aquece a letra invertida, que sai neutra.
+ */
+export function pdfPagePaint(palette: ReaderTheme['palette']): PdfPagePaint {
+  const { bg, fg } = PALETTES[palette]
+  const paper = srgbLuminance(bg)
+  const ink = srgbLuminance(fg)
+
+  if (DARK_PALETTES.includes(palette)) {
+    // letra = α·1 + (1 − α)·papel = tinta  →  α = (tinta − papel) / (1 − papel)
+    const opacity = clamp((ink - paper) / (1 - paper), 0.3, 1)
+    return {
+      filter: 'invert(1) hue-rotate(180deg) sepia(0.8)',
+      blend: 'screen',
+      opacity: Number(opacity.toFixed(3)),
+    }
+  }
+
+  // letra = (1 − α)·papel = tinta  →  α = 1 − tinta / papel
+  return { filter: '', blend: 'multiply', opacity: Number(clamp(1 - ink / paper, 0.3, 1).toFixed(3)) }
 }
 
 /**
@@ -35,6 +82,7 @@ export function buildContentCss(
   const sidePad = theme.margin + (columnWidth - contentWidth) / 2
 
   return `
+${READER_FONT_FACES}
 :root { color-scheme: ${theme.palette === 'light' || theme.palette === 'sepia' ? 'light' : 'dark'}; }
 html, body {
   margin: 0 !important;

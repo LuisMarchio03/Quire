@@ -32,25 +32,25 @@ export function MergeOffer({ suggestion, onMerge, onDismiss }: MergeOfferProps) 
     <div
       role="region"
       aria-label="Livros que parecem ser o mesmo"
-      className="mb-4 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2.5 text-sm text-ink"
+      className="mb-6 rounded-xl bg-surface px-4 py-3.5 text-sm text-ink"
     >
-      <p>{describe(suggestion)}</p>
-      <p className="mt-1 text-xs text-ink-dim">
+      <p className="leading-relaxed">{describe(suggestion)}</p>
+      <p className="mt-1 text-xs leading-relaxed text-ink-faint">
         Juntar fica com o progresso mais recente, leva as anotações e as etiquetas dos dois, e o
         arquivo que está aqui continua servindo.
       </p>
-      <div className="mt-2 flex flex-wrap gap-2">
+      <div className="mt-3 flex flex-wrap gap-2">
         <button
           type="button"
           onClick={onMerge}
-          className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-canvas hover:bg-accent/90"
+          className="rounded-xl bg-accent px-3.5 py-1.5 text-xs font-medium text-canvas hover:bg-accent/90"
         >
           Juntar
         </button>
         <button
           type="button"
           onClick={onDismiss}
-          className="rounded-lg border border-line px-3 py-1.5 text-xs text-ink-dim hover:text-ink"
+          className="rounded-xl bg-surface-2 px-3.5 py-1.5 text-xs text-ink-dim hover:text-ink"
         >
           Não, são livros diferentes
         </button>

@@ -3,6 +3,7 @@ import { useLibrary, type StatusFilter } from './useLibrary'
 import { BookCard } from './BookCard'
 import { MergeOffer } from './MergeOffer'
 import { TagEditor } from './TagEditor'
+import { Icon } from '../ui/Icon'
 
 const FILTERS: Array<{ value: StatusFilter; label: string }> = [
   { value: 'all', label: 'Todos' },
@@ -18,6 +19,8 @@ const STAGE_LABEL: Record<string, string> = {
   'gravação': 'guardando',
   pronto: 'pronto',
 }
+
+const iconButton = 'grid size-9 shrink-0 place-items-center rounded-xl text-ink-dim transition hover:text-ink'
 
 interface LibraryScreenProps {
   onOpen: (bookId: string) => void
@@ -65,58 +68,67 @@ export function LibraryScreen({
       onDragLeave={() => setDragging(false)}
       onDrop={onDrop}
     >
-      <header className="sticky top-0 z-20 border-b border-line bg-canvas/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-3">
-          <h1 className="font-serif text-xl text-accent">Quire</h1>
+      <header className="sticky top-0 z-20 bg-canvas/95 backdrop-blur">
+        <div className="mx-auto max-w-6xl px-4 pt-[max(0.75rem,env(safe-area-inset-top))]">
+          <div className="flex items-center gap-1">
+            <h1 className="flex-1 font-serif text-[1.375rem] font-medium tracking-tight text-accent">
+              Quire
+            </h1>
+            <button
+              type="button"
+              onClick={() => pickFiles()}
+              aria-label="Adicionar livro"
+              title="Adicionar livro"
+              className={iconButton}
+            >
+              <Icon name="plus" />
+            </button>
+            {onOpenSettings && (
+              <button
+                type="button"
+                onClick={onOpenSettings}
+                aria-label="Ajustes"
+                title="Ajustes"
+                className={iconButton}
+              >
+                <Icon name="sliders" />
+              </button>
+            )}
+          </div>
 
-          <input
-            type="search"
-            role="searchbox"
-            aria-label="Buscar na estante"
-            placeholder="Buscar por título ou autor"
-            value={library.query}
-            onChange={(event) => library.setQuery(event.target.value)}
-            className="min-w-40 flex-1 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink placeholder:text-ink-faint focus:border-accent/60 focus:outline-none"
-          />
+          <label className="mt-2 flex items-center gap-2 rounded-xl bg-surface px-3.5 py-2 text-ink-faint focus-within:ring-1 focus-within:ring-accent/40">
+            <Icon name="search" size={16} />
+            <input
+              type="search"
+              role="searchbox"
+              aria-label="Buscar na estante"
+              placeholder="Buscar por título, autor ou etiqueta"
+              value={library.query}
+              onChange={(event) => library.setQuery(event.target.value)}
+              className="min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-ink-faint focus:outline-none"
+            />
+          </label>
 
-          <div className="flex gap-1">
+          <div className="mt-3 flex gap-5 text-[0.8125rem]">
             {FILTERS.map((filter) => (
               <button
                 key={filter.value}
                 type="button"
                 onClick={() => library.setStatusFilter(filter.value)}
-                className={`rounded-full px-3 py-1 text-xs transition ${
+                className={`border-b-[1.5px] pb-2 transition ${
                   library.statusFilter === filter.value
-                    ? 'bg-accent/15 text-accent'
-                    : 'text-ink-dim hover:text-ink'
+                    ? 'border-accent text-ink'
+                    : 'border-transparent text-ink-faint hover:text-ink-dim'
                 }`}
               >
                 {filter.label}
               </button>
             ))}
           </div>
-
-          <button
-            type="button"
-            onClick={() => pickFiles()}
-            className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-canvas hover:bg-accent/90"
-          >
-            Adicionar
-          </button>
-
-          {onOpenSettings && (
-            <button
-              type="button"
-              onClick={onOpenSettings}
-              aria-label="Ajustes"
-              className="rounded-lg border border-line px-2.5 py-1.5 text-sm text-ink-dim hover:text-ink"
-            >
-              ⚙
-            </button>
-          )}
         </div>
+
         {library.availableTags.length > 0 && (
-          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-1.5 px-4 pb-2">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-1.5 px-4 pt-3">
             {library.availableTags.map(({ tag, count }) => {
               const ativa = library.selectedTags.includes(tag)
               return (
@@ -125,13 +137,11 @@ export function LibraryScreen({
                   type="button"
                   aria-pressed={ativa}
                   onClick={() => library.toggleTag(tag)}
-                  className={`rounded-full border px-2.5 py-1 text-xs transition ${
-                    ativa
-                      ? 'border-accent/60 bg-accent/15 text-accent'
-                      : 'border-line text-ink-dim hover:text-ink'
+                  className={`rounded-full px-2.5 py-1 text-xs transition ${
+                    ativa ? 'bg-accent/15 text-accent' : 'bg-surface text-ink-dim hover:text-ink'
                   }`}
                 >
-                  {tag} <span className="text-ink-faint">{count}</span>
+                  {tag} <span className={ativa ? 'text-accent/60' : 'text-ink-faint'}>{count}</span>
                 </button>
               )
             })}
@@ -147,7 +157,7 @@ export function LibraryScreen({
           </div>
         )}
 
-        {statusSlot && <div className="mx-auto max-w-6xl px-4 pb-2">{statusSlot}</div>}
+        {statusSlot && <div className="mx-auto max-w-6xl px-4 pt-2.5">{statusSlot}</div>}
       </header>
 
       <input
@@ -177,22 +187,22 @@ export function LibraryScreen({
         {library.message && (
           <div
             role="alert"
-            className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-ink"
+            className="mb-5 flex items-start justify-between gap-3 rounded-xl bg-danger/10 px-4 py-3 text-sm text-ink"
           >
             <span>{library.message}</span>
             <button
               type="button"
               onClick={library.dismissMessage}
               aria-label="Fechar aviso"
-              className="text-ink-dim hover:text-ink"
+              className="grid size-6 shrink-0 place-items-center rounded-lg text-ink-dim hover:text-ink"
             >
-              ✕
+              <Icon name="close" size={16} />
             </button>
           </div>
         )}
 
         {library.importing && (
-          <p className="mb-4 text-sm text-ink-dim">
+          <p className="mb-5 text-sm text-ink-dim">
             Adicionando <span className="text-ink">{library.importing.name}</span> —{' '}
             {STAGE_LABEL[library.importing.stage] ?? library.importing.stage}
             {library.importing.stage === 'hash' &&
@@ -201,11 +211,12 @@ export function LibraryScreen({
         )}
 
         {!library.loading && library.books.length === 0 && (
-          <div className="mx-auto max-w-md py-20 text-center">
+          <div className="mx-auto max-w-md py-24 text-center">
             <p className="font-serif text-2xl text-ink">Sua estante está vazia</p>
-            <p className="mt-2 text-sm text-ink-dim">
-              Arraste um EPUB ou um PDF para esta janela, ou use o botão Adicionar. O arquivo fica
-              guardado só neste aparelho — anotações e progresso é que viajam entre eles.
+            <p className="mt-3 text-sm leading-relaxed text-ink-dim">
+              Arraste um EPUB ou um PDF para esta janela, ou toque em{' '}
+              <span className="text-ink">+</span>. O arquivo fica guardado só neste aparelho —
+              anotações e progresso é que viajam entre eles.
             </p>
           </div>
         )}
@@ -214,7 +225,7 @@ export function LibraryScreen({
           <p className="py-16 text-center text-sm text-ink-dim">Nada encontrado com esse filtro.</p>
         )}
 
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-x-4 gap-y-6">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-x-5 gap-y-8">
           {library.visible.map((book) => (
             <BookCard
               key={book.id}
@@ -249,7 +260,7 @@ export function LibraryScreen({
         })()}
 
       {dragging && (
-        <div className="pointer-events-none fixed inset-4 z-30 grid place-items-center rounded-2xl border-2 border-dashed border-accent/70 bg-canvas/80 text-accent">
+        <div className="pointer-events-none fixed inset-4 z-30 grid place-items-center rounded-2xl border border-dashed border-accent/60 bg-canvas/85 text-accent">
           Solte para adicionar à estante
         </div>
       )}

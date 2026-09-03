@@ -14,14 +14,23 @@ const TONE: Record<SyncState, string> = {
   error: 'text-danger',
 }
 
+const DOT: Record<SyncState, string> = {
+  idle: 'bg-[#7fc4a2]',
+  syncing: 'bg-accent animate-pulse',
+  offline: 'bg-ink-faint',
+  error: 'bg-danger',
+}
+
+/** Um ponto e uma linha de texto: o estado se lê de relance, sem ler. */
 export function SyncIndicator({ state, onSyncNow }: { state: SyncState; onSyncNow?: () => void }) {
   return (
     <button
       type="button"
       onClick={onSyncNow}
-      className={`text-xs ${TONE[state]} hover:underline`}
+      className={`flex items-center gap-1.5 text-[0.6875rem] ${TONE[state]} hover:underline`}
       aria-live="polite"
     >
+      <span aria-hidden="true" className={`size-1.5 rounded-full ${DOT[state]}`} />
       {LABEL[state]}
     </button>
   )

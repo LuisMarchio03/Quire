@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildContentCss, PALETTES } from './contentStyles'
+import { buildContentCss, PALETTES, pdfPagePaint } from './contentStyles'
 import { DEFAULT_THEME } from './types'
 
 /** Luminância relativa, conforme a WCAG. */
@@ -50,5 +50,50 @@ describe('paletas de leitura', () => {
     const css = buildContentCss({ ...DEFAULT_THEME, palette: 'sepia' }, { width: 800, height: 1000 })
     expect(css).toContain(PALETTES.sepia.bg)
     expect(css).toContain(PALETTES.sepia.fg)
+  })
+})
+
+describe('pintura da página do PDF', () => {
+  it('nas paletas escuras inverte a folha e a funde por screen: o branco vira exatamente o fundo', () => {
+    for (const palette of ['dark', 'oled', 'gray'] as const) {
+      const paint = pdfPagePaint(palette)
+      expect(paint.filter).toContain('invert(1)')
+      expect(paint.blend).toBe('screen')
+      expect(paint.opacity).toBeGreaterThan(0.3)
+      expect(paint.opacity).toBeLessThanOrEqual(1)
+    }
+  })
+
+  it('nas paletas claras funde por multiply, sem inverter', () => {
+    for (const palette of ['light', 'sepia'] as const) {
+      const paint = pdfPagePaint(palette)
+      expect(paint.filter).toBe('')
+      expect(paint.blend).toBe('multiply')
+      expect(paint.opacity).toBeGreaterThan(0.5)
+      expect(paint.opacity).toBeLessThan(1)
+    }
+  })
+
+  it('a opacidade leva a letra à luminância da tinta da paleta', () => {
+    // No escuro: texto = α·1 + (1−α)·fundo; no claro: texto = (1−α)·fundo.
+    const lum = (hex: string) => {
+      const c = (i: number) => Number.parseInt(hex.slice(i, i + 2), 16) / 255
+      return 0.2126 * c(1) + 0.7152 * c(3) + 0.0722 * c(5)
+    }
+    const dark = pdfPagePaint('dark')
+    const bgDark = lum(PALETTES.dark.bg)
+    expect(dark.opacity + (1 - dark.opacity) * bgDark).toBeCloseTo(lum(PALETTES.dark.fg), 1)
+
+    const sepia = pdfPagePaint('sepia')
+    expect((1 - sepia.opacity) * lum(PALETTES.sepia.bg)).toBeCloseTo(lum(PALETTES.sepia.fg), 1)
+  })
+})
+
+describe('fonte de leitura embutida', () => {
+  it('a folha do capítulo declara a Literata, porque o iframe não enxerga as fontes do app', () => {
+    const css = buildContentCss(DEFAULT_THEME, { width: 800, height: 1000 })
+    expect(css).toContain("@font-face")
+    expect(css).toContain("font-family: 'Literata Variable'")
+    expect(css).toMatch(/#quire-content \{[^}]*font-family: 'Literata Variable'/)
   })
 })

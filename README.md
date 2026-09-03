@@ -10,7 +10,7 @@
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38BDF8?logo=tailwindcss&logoColor=white)
 ![Turso](https://img.shields.io/badge/Turso-libSQL-4FF8D2?logo=turso&logoColor=black)
 ![PWA](https://img.shields.io/badge/PWA-instalável-5A0FC8?logo=pwa&logoColor=white)
-![Testes](https://img.shields.io/badge/testes-399%20passando-3FB950)
+![Testes](https://img.shields.io/badge/testes-408%20passando-3FB950)
 
 </div>
 
@@ -63,7 +63,11 @@ plano no celular.
 - **Tipografia ajustável.** Fonte serifada, sem serifa ou espaçada para leitura
   fácil; tamanho, entrelinha, margem, largura da coluna, justificação e
   hifenização.
-- **Cinco temas.** Claro, sépia, cinza, escuro e preto para telas OLED.
+- **Cinco temas.** Claro, sépia, cinza, escuro e preto para telas OLED. No
+  PDF, a página é fundida com o papel do tema — nada de bloco cinza no meio
+  do leitor.
+- **Literata embutida.** A serifa de leitura vai dentro do app (só os
+  subconjuntos latinos, ~190 KB) e não depende do que o aparelho tem instalado.
 - **Modo foco.** Escurece o texto fora do parágrafo em leitura, com régua
   opcional sob a linha. As setas ↑ ↓ movem o foco.
 - **Destaques, notas e marcas de página**, com âncoras que sobrevivem a mudança
@@ -122,7 +126,7 @@ lugar nenhum — só o derivado PBKDF2-SHA256 com 210 000 iterações.
 
 ```bash
 npm run dev      # http://localhost:5273
-npm test         # 399 testes
+npm test         # 408 testes
 npm run build
 ```
 
@@ -154,6 +158,12 @@ docs/superpowers/ design e plano de implementação
 ```
 
 ## Decisões que valem explicação
+
+**Papel e tinta, sem excesso.** O cromo é escuro e quente para não competir
+com a página, e separa as coisas por espaço e fios finos, não por caixas com
+borda. Ícones são SVG em linha, porque símbolos de texto mudam de desenho de um
+aparelho para outro. No leitor sobra uma linha no rodapé e um fio de progresso;
+setas só aparecem onde há mouse.
 
 **Motor de EPUB próprio, e não epub.js.** O modo foco precisa manipular o DOM do
 capítulo — envolver parágrafos, medir, aplicar transições — e a tipografia

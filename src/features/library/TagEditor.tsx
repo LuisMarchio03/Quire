@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { foldTag, normalizeTags, parseTagInput, type TagCount } from '../../lib/library/tags'
 import type { Book } from '../../lib/types'
+import { Icon } from '../ui/Icon'
 
 interface TagEditorProps {
   book: Book
@@ -36,25 +37,25 @@ export function TagEditor({ book, available, onSave, onClose }: TagEditorProps) 
         aria-modal="true"
         aria-label={`Etiquetas de ${book.title}`}
         onClick={(event) => event.stopPropagation()}
-        className="w-full max-w-md rounded-xl border border-line bg-surface p-5 shadow-2xl"
+        className="w-full max-w-md rounded-2xl bg-surface p-5 shadow-pop"
       >
-        <h2 className="text-sm font-medium text-ink">Etiquetas</h2>
-        <p className="mt-0.5 truncate text-xs text-ink-faint">{book.title}</p>
+        <h2 className="text-sm text-ink">Etiquetas</h2>
+        <p className="mt-0.5 truncate font-serif text-[0.9375rem] text-ink-dim">{book.title}</p>
 
         <div className="mt-4 flex flex-wrap gap-1.5">
           {tags.map((tag) => (
             <span
               key={tag}
-              className="flex items-center gap-1 rounded-full bg-accent/15 py-1 pl-3 pr-1.5 text-xs text-accent"
+              className="flex items-center gap-1 rounded-full bg-accent/15 py-1 pl-3 pr-1 text-xs text-accent"
             >
               {tag}
               <button
                 type="button"
                 aria-label={`Remover etiqueta ${tag}`}
                 onClick={() => remove(tag)}
-                className="grid size-4 place-items-center rounded-full text-accent/70 hover:text-accent"
+                className="grid size-5 place-items-center rounded-full text-accent/70 hover:text-accent"
               >
-                ✕
+                <Icon name="close" size={12} />
               </button>
             </span>
           ))}
@@ -82,27 +83,29 @@ export function TagEditor({ book, available, onSave, onClose }: TagEditorProps) 
                 add(draft)
               }
             }}
-            className="min-w-0 flex-1 rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-accent/60 focus:outline-none"
+            className="min-w-0 flex-1 rounded-xl bg-surface-2 px-3.5 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-1 focus:ring-accent/40"
           />
           <button
             type="submit"
             disabled={!draft.trim()}
-            className="rounded-lg border border-line px-3 text-sm text-ink-dim disabled:opacity-30"
+            className="rounded-xl bg-surface-2 px-3.5 text-sm text-ink-dim hover:text-ink disabled:opacity-30"
           >
             Adicionar
           </button>
         </form>
 
         {sugestoes.length > 0 && (
-          <div className="mt-4">
-            <p className="text-xs text-ink-faint">Já usadas no acervo</p>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
+          <div className="mt-5">
+            <p className="text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">
+              Já usadas no acervo
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
               {sugestoes.map(({ tag, count }) => (
                 <button
                   key={tag}
                   type="button"
                   onClick={() => add(tag)}
-                  className="rounded-full border border-line px-2.5 py-1 text-xs text-ink-dim hover:border-accent/50 hover:text-ink"
+                  className="rounded-full bg-surface-2 px-2.5 py-1 text-xs text-ink-dim hover:text-ink"
                 >
                   {tag} <span className="text-ink-faint">{count}</span>
                 </button>
@@ -111,18 +114,18 @@ export function TagEditor({ book, available, onSave, onClose }: TagEditorProps) 
           </div>
         )}
 
-        <div className="mt-5 flex gap-2">
+        <div className="mt-6 flex gap-2">
           <button
             type="button"
             onClick={() => onSave(tags)}
-            className="flex-1 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-canvas"
+            className="flex-1 rounded-xl bg-accent px-3 py-2 text-sm font-medium text-canvas"
           >
             Salvar
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 rounded-lg border border-line px-3 py-2 text-sm text-ink-dim"
+            className="flex-1 rounded-xl bg-surface-2 px-3 py-2 text-sm text-ink-dim hover:text-ink"
           >
             Cancelar
           </button>

@@ -99,6 +99,27 @@ describe('pdfEngine', () => {
     expect(canvas.style.filter).toBe('')
   })
 
+  it('a página é pintada com o papel e a tinta da paleta, não como um bloco cinza', async () => {
+    const engine = createPdfEngine(fakeSource())
+    await engine.mount(container)
+    const canvas = container.querySelector('canvas') as HTMLCanvasElement
+    const stack = canvas.parentElement as HTMLElement
+
+    engine.applyTheme({ ...DEFAULT_THEME, palette: 'dark' })
+    expect(canvas.style.getPropertyValue('mix-blend-mode')).toBe('screen')
+    expect(Number(canvas.style.opacity)).toBeGreaterThan(0.5)
+    expect(Number(canvas.style.opacity)).toBeLessThan(1)
+    // O fundo contra o qual a folha se funde é o papel da paleta, isolado do resto.
+    expect(stack.style.background).toBe('rgb(32, 28, 24)')
+    expect(stack.style.getPropertyValue('isolation')).toBe('isolate')
+
+    engine.applyTheme({ ...DEFAULT_THEME, palette: 'sepia' })
+    expect(canvas.style.getPropertyValue('mix-blend-mode')).toBe('multiply')
+    expect(canvas.style.filter).toBe('')
+    expect(Number(canvas.style.opacity)).toBeLessThan(1)
+    expect(stack.style.background).toBe('rgb(243, 233, 214)')
+  })
+
   it('search percorre o documento e devolve a página certa', async () => {
     const engine = createPdfEngine(fakeSource())
     await engine.mount(container)

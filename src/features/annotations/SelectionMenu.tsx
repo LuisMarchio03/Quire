@@ -1,4 +1,5 @@
 import { HIGHLIGHT_COLORS, type HighlightColor } from '../../lib/types'
+import { Icon } from '../ui/Icon'
 
 interface SelectionMenuProps {
   /** Posição na janela, já convertida das coordenadas do conteúdo. */
@@ -16,7 +17,7 @@ export function SelectionMenu({ x, y, onHighlight, onNote, onCopy, onClose }: Se
       role="menu"
       aria-label="Ações do trecho selecionado"
       style={{ left: Math.max(8, x), top: Math.max(8, y) }}
-      className="fixed z-50 flex -translate-x-1/2 items-center gap-1 rounded-full border border-line bg-surface-2 px-2 py-1.5 shadow-xl"
+      className="fixed z-50 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-surface-2 py-1.5 pl-2.5 pr-1.5 shadow-pop"
     >
       {HIGHLIGHT_COLORS.map((color) => (
         <button
@@ -25,10 +26,10 @@ export function SelectionMenu({ x, y, onHighlight, onNote, onCopy, onClose }: Se
           aria-label={`Destacar em ${colorName(color)}`}
           onClick={() => onHighlight(color)}
           style={{ background: color }}
-          className="size-6 rounded-full ring-1 ring-black/20 transition hover:scale-110"
+          className="size-6 rounded-full transition hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         />
       ))}
-      <span className="mx-1 h-5 w-px bg-line" />
+      <span className="mx-1 h-4 w-px bg-line" />
       <button
         type="button"
         onClick={onNote}
@@ -47,9 +48,9 @@ export function SelectionMenu({ x, y, onHighlight, onNote, onCopy, onClose }: Se
         type="button"
         onClick={onClose}
         aria-label="Fechar"
-        className="rounded-full px-1.5 py-1 text-xs text-ink-faint hover:text-ink"
+        className="grid size-7 place-items-center rounded-full text-ink-faint hover:text-ink"
       >
-        ✕
+        <Icon name="close" size={16} />
       </button>
     </div>
   )

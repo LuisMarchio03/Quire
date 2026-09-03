@@ -494,8 +494,6 @@ export function ReaderScreen({ bookId, onClose, uiScale }: ReaderScreenProps) {
           percent={percent}
           bookmarked={bookmarked}
           focusEnabled={focus.enabled}
-          zoom={engine?.canZoom() ? { value: zoom, onChange: (v) => void applyZoom(v) } : undefined}
-          crop={engine?.canCrop() ? { enabled: crop, onToggle: () => void toggleCrop() } : undefined}
           onBack={() => void close()}
           onPrev={() => void engine?.prev()}
           onNext={() => void engine?.next()}
@@ -529,6 +527,16 @@ export function ReaderScreen({ bookId, onClose, uiScale }: ReaderScreenProps) {
           theme={theme}
           focus={focus}
           uiScale={uiScale}
+          page={
+            engine?.canZoom()
+              ? {
+                  zoom,
+                  onZoom: (value) => void applyZoom(value),
+                  crop,
+                  onCrop: () => void toggleCrop(),
+                }
+              : undefined
+          }
           onTheme={updateTheme}
           onFocus={updateFocus}
           onReset={resetTheme}

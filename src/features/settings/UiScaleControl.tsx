@@ -17,31 +17,29 @@ export function UiScaleControl({ controls, variant = 'section' }: UiScaleControl
   const compacto = variant === 'panel'
 
   return (
-    <div className={compacto ? '' : 'rounded-xl border border-line bg-surface p-4'}>
-      <div className="flex items-center justify-between gap-3">
+    <div>
+      <div className="flex items-center justify-between gap-3 py-2.5">
         <div className="min-w-0">
-          <h2 className={compacto ? 'text-sm text-ink' : 'text-sm font-medium text-ink'}>
-            Tamanho da interface
-          </h2>
+          <h2 className={`text-sm ${compacto ? 'text-ink-dim' : 'text-ink'}`}>Tamanho da interface</h2>
           {!compacto && (
-            <p className="mt-1 text-xs text-ink-faint">
+            <p className="mt-0.5 text-xs leading-relaxed text-ink-faint">
               Aumenta botões, menus e a estante. O texto do livro tem controle próprio, dentro da
               leitura.
             </p>
           )}
         </div>
 
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-0.5">
           <button
             type="button"
             aria-label="Diminuir interface"
             onClick={controls.decrease}
             disabled={controls.atMin}
-            className="size-8 rounded-md border border-line text-ink-dim hover:text-ink disabled:opacity-30"
+            className="grid size-8 place-items-center rounded-lg bg-surface-2 text-ink-dim hover:text-ink disabled:opacity-30"
           >
             −
           </button>
-          <span className="w-14 text-center text-sm tabular-nums text-ink">
+          <span className="w-14 text-center text-[0.8125rem] tabular-nums text-ink">
             {Math.round(controls.scale * 100)}%
           </span>
           <button
@@ -49,7 +47,7 @@ export function UiScaleControl({ controls, variant = 'section' }: UiScaleControl
             aria-label="Aumentar interface"
             onClick={controls.increase}
             disabled={controls.atMax}
-            className="size-8 rounded-md border border-line text-ink-dim hover:text-ink disabled:opacity-30"
+            className="grid size-8 place-items-center rounded-lg bg-surface-2 text-ink-dim hover:text-ink disabled:opacity-30"
           >
             +
           </button>
@@ -60,7 +58,7 @@ export function UiScaleControl({ controls, variant = 'section' }: UiScaleControl
         <button
           type="button"
           onClick={controls.reset}
-          className="mt-2 text-xs text-ink-faint underline underline-offset-2 hover:text-ink-dim"
+          className="text-xs text-ink-faint underline underline-offset-2 hover:text-ink-dim"
         >
           Voltar a 100%
         </button>
