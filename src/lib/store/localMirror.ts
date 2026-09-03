@@ -46,6 +46,19 @@ export const localMirror = {
     if (queue) await enqueue('book', book.id)
   },
 
+  /**
+   * O livro dono de um hash de arquivo: pelo próprio id ou por alias. É a porta
+   * de entrada da importação — um arquivo que o dono já declarou ser "o mesmo
+   * livro" reencontra o registro certo em qualquer aparelho.
+   */
+  async findBookByFileId(fileId: string): Promise<Book | undefined> {
+    const db = await openQuireDb()
+    const direct = await db.get('books', fileId)
+    if (direct) return direct
+    const all = await db.getAll('books')
+    return all.find((book) => (book.aliases ?? []).includes(fileId))
+  },
+
   async getProgress(bookId: string): Promise<Progress | undefined> {
     const db = await openQuireDb()
     return db.get('progress', bookId)

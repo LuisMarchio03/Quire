@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, render, screen, waitFor, cleanup } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ReaderScreen } from './ReaderScreen'
@@ -25,6 +25,7 @@ const BOOK: Book = {
   spineCount: 3,
   status: 'unread',
   tags: [],
+  aliases: [],
   addedAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
   deletedAt: null,
@@ -49,9 +50,9 @@ const escalaFalsa = {
   atMax: false,
 }
 
-async function openReader() {
+async function openReader(onClose: () => void = () => {}) {
   const view = render(
-    <ReaderScreen bookId={BOOK.id} onClose={() => {}} uiScale={escalaFalsa} />,
+    <ReaderScreen bookId={BOOK.id} onClose={onClose} uiScale={escalaFalsa} />,
   )
   // O conteúdo do iframe aparece durante a montagem do motor, antes de o React
   // terminar de aplicar o estado. Esperar pelos dois evita teste instável.
@@ -388,5 +389,20 @@ describe('ReaderScreen', () => {
     // Botão opaco no meio da tela cobre a linha que se está lendo.
     expect(anterior.closest('footer')).not.toBeNull()
     expect(proxima.closest('footer')).not.toBeNull()
+  })
+})
+
+describe('ReaderScreen — fechar o livro', () => {
+  it('fechar logo depois de virar a página não perde a posição', async () => {
+    await seed()
+    const onClose = vi.fn()
+    await openReader(onClose)
+
+    clickAt(950)
+    await waitFor(() => expect(contentText()).toContain('serra guarda'))
+    await userEvent.click(screen.getByRole('button', { name: /voltar para a estante/i }))
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect((await localMirror.getProgress(BOOK.id))?.locator.spineIndex).toBe(1)
   })
 })

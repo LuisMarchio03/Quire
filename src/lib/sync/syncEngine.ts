@@ -1,4 +1,7 @@
 import { localMirror } from '../store/localMirror'
+import { createBookStore } from '../store/bookStore'
+import { adoptAliasedFiles, unionStrings, type FileStore } from '../library/aliases'
+import { nowIso } from '../time'
 import type { Annotation, Book, Progress } from '../types'
 
 export type SyncState = 'idle' | 'syncing' | 'offline' | 'error'
@@ -50,15 +53,20 @@ export interface SyncEngine {
 export interface SyncEngineOptions {
   transport: SyncTransport
   listLocalFiles: () => Promise<string[]>
+  /** Onde os arquivos moram — para mover um arquivo guardado sob alias. */
+  store?: FileStore
   onStateChange?: (state: SyncState) => void
   onCopies?: (copies: CopyInfo[]) => void
+  /** Chegou mudança do servidor e foi aplicada: a interface precisa reler. */
+  onPulled?: (count: number) => void
 }
 
 const DEFAULT_INTERVAL_MS = 60_000
 const MAX_BACKOFF_MS = 5 * 60_000
 
 export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
-  const { transport, listLocalFiles, onStateChange, onCopies } = options
+  const { transport, listLocalFiles, onStateChange, onCopies, onPulled } = options
+  const store = options.store ?? createBookStore()
 
   let inFlight: Promise<SyncResult> | null = null
   let currentState: SyncState = 'idle'
@@ -112,10 +120,22 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
   /** Também aqui vale última escrita vence: o delta não atropela edição local mais nova. */
   async function applyChange(change: Change): Promise<boolean> {
     if (change.entity === 'book') {
-      const current = await localMirror.getBook(change.data.id)
-      if (current && current.updatedAt >= change.data.updatedAt) return false
-      await localMirror.saveBook(change.data, { queue: false })
-      return true
+      const incoming = change.data
+      const current = await localMirror.getBook(incoming.id)
+      const incomingWins = !current || current.updatedAt < incoming.updatedAt
+      const base: Book = incomingWins || !current ? incoming : current
+
+      // Alias é fato que só cresce. Última escrita vence não pode apagar "este
+      // arquivo é este livro", senão o aparelho que guarda o arquivo sob o
+      // alias fica órfão. A união volta ao servidor com carimbo novo.
+      const known = (incomingWins ? current?.aliases : incoming.aliases) ?? []
+      const aliases = unionStrings(base.aliases ?? [], known)
+      const grew = aliases.length > (base.aliases ?? []).length
+      const book: Book = grew ? { ...base, aliases, updatedAt: nowIso() } : base
+
+      if (incomingWins || grew) await localMirror.saveBook(book, { queue: grew })
+      const adopted = await adoptAliasedFiles(book, store)
+      return incomingWins || grew || adopted
     }
     if (change.entity === 'progress') {
       const current = await localMirror.getProgress(change.data.bookId)
@@ -148,6 +168,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       for (const change of reply.changes) if (await applyChange(change)) pulled++
 
       await localMirror.setSyncCursor(reply.cursor)
+      if (pulled > 0) onPulled?.(pulled)
 
       knownCopies = reply.copies ?? []
       onCopies?.(knownCopies)
@@ -172,6 +193,11 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
 
   const onOnline = () => void engine.syncNow()
   const onFocus = () => void engine.syncNow()
+  // No celular, voltar do segundo plano nem sempre dispara `focus`; o que
+  // avisa é a visibilidade do documento.
+  const onVisible = () => {
+    if (globalThis.document?.visibilityState !== 'hidden') void engine.syncNow()
+  }
 
   const engine: SyncEngine = {
     syncNow() {
@@ -186,6 +212,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       running = true
       globalThis.addEventListener?.('online', onOnline)
       globalThis.addEventListener?.('focus', onFocus)
+      globalThis.document?.addEventListener?.('visibilitychange', onVisible)
       void engine.syncNow().finally(() => schedule(intervalMs))
     },
 
@@ -195,6 +222,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       timer = null
       globalThis.removeEventListener?.('online', onOnline)
       globalThis.removeEventListener?.('focus', onFocus)
+      globalThis.document?.removeEventListener?.('visibilitychange', onVisible)
     },
 
     state: () => currentState,

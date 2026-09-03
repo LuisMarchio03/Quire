@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { importBook, type ImportStage } from '../../lib/library/importBook'
+import { mergeBooks } from '../../lib/library/mergeBooks'
+import { findTwins, twinKey } from '../../lib/library/twins'
 import { createBookStore } from '../../lib/store/bookStore'
 import { localMirror } from '../../lib/store/localMirror'
 import { nowIso } from '../../lib/time'
@@ -14,7 +16,43 @@ export interface ImportingState {
   fraction: number
 }
 
-export function useLibrary() {
+/**
+ * Dois livros que podem ser o mesmo. `twin` a estante achou sozinha; `file` o
+ * dono escolheu um arquivo para um cartão e o arquivo não era idêntico.
+ */
+export interface MergeSuggestion {
+  kind: 'twin' | 'file'
+  loser: Book
+  survivor: Book
+}
+
+const DISMISSED_KEY = 'quire.twinsDismissed'
+
+function readDismissed(): string[] {
+  try {
+    const parsed: unknown = JSON.parse(globalThis.localStorage?.getItem(DISMISSED_KEY) ?? '[]')
+    return Array.isArray(parsed) ? parsed.filter((key) => typeof key === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function writeDismissed(keys: string[]): void {
+  try {
+    globalThis.localStorage?.setItem(DISMISSED_KEY, JSON.stringify(keys))
+  } catch {
+    /* sem armazenamento: a recusa vale só enquanto a aba estiver aberta */
+  }
+}
+
+export interface LibraryOptions {
+  /** Muda quando a sincronização trouxe algo: a estante relê o espelho. */
+  refreshKey?: number
+  /** Chamado depois de juntar dois livros — a hora de subir a mudança. */
+  onMerged?: () => void
+}
+
+export function useLibrary({ refreshKey = 0, onMerged }: LibraryOptions = {}) {
   const store = useMemo(() => createBookStore(), [])
   const [books, setBooks] = useState<Book[]>([])
   const [percents, setPercents] = useState<Record<string, number>>({})
@@ -25,6 +63,8 @@ export function useLibrary() {
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [importing, setImporting] = useState<ImportingState | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [offer, setOffer] = useState<MergeSuggestion | null>(null)
+  const [dismissed, setDismissed] = useState<string[]>(readDismissed)
 
   const refresh = useCallback(async () => {
     const [list, ids] = await Promise.all([localMirror.listBooks(), store.list()])
@@ -39,7 +79,7 @@ export function useLibrary() {
 
   useEffect(() => {
     void refresh()
-  }, [refresh])
+  }, [refresh, refreshKey])
 
   const importFiles = useCallback(
     async (files: File[], expectedBookId?: string) => {
@@ -54,9 +94,17 @@ export function useLibrary() {
           if (result.status === 'unsupported') {
             setMessage(`Não deu para abrir "${file.name}": ${result.reason}.`)
           } else if (expectedBookId && result.book.id !== expectedBookId) {
-            setMessage(
-              `Esse arquivo não é o mesmo livro — o conteúdo é outro. Ele entrou na estante como "${result.book.title}".`,
-            )
+            // O dono escolheu este arquivo para aquele cartão. Se o formato
+            // bate, o mais provável é ser o mesmo livro vindo por outro
+            // caminho — a decisão é dele, com a contagem de páginas à vista.
+            const target = await localMirror.getBook(expectedBookId)
+            if (target && !target.deletedAt && target.format === result.book.format) {
+              setOffer({ kind: 'file', loser: result.book, survivor: target })
+            } else {
+              setMessage(
+                `Esse arquivo não é o mesmo livro — o conteúdo é outro. Ele entrou na estante como "${result.book.title}".`,
+              )
+            }
           }
         } catch (error) {
           setMessage(
@@ -93,6 +141,33 @@ export function useLibrary() {
     () => filterBooks(books, { query, tags: selectedTags, status: statusFilter }),
     [books, query, selectedTags, statusFilter],
   )
+
+  /**
+   * A sugestão da vez: a explícita, se o dono acabou de escolher um arquivo;
+   * senão, o primeiro par de gêmeos que a estante encontra e ele ainda não
+   * recusou. Uma por vez — juntado um, a releitura acha o próximo.
+   */
+  const suggestion = useMemo<MergeSuggestion | null>(() => {
+    if (offer) return offer
+    const [pair] = findTwins(books, { dismissed })
+    return pair ? { kind: 'twin', survivor: pair[0], loser: pair[1] } : null
+  }, [books, dismissed, offer])
+
+  const acceptSuggestion = useCallback(async () => {
+    if (!suggestion) return
+    setOffer(null)
+    await mergeBooks(suggestion.loser.id, suggestion.survivor.id)
+    await refresh()
+    onMerged?.()
+  }, [onMerged, refresh, suggestion])
+
+  const dismissSuggestion = useCallback(() => {
+    if (!suggestion) return
+    setOffer(null)
+    const keys = [...new Set([...readDismissed(), twinKey(suggestion.loser, suggestion.survivor)])]
+    writeDismissed(keys)
+    setDismissed(keys)
+  }, [suggestion])
 
   /** As etiquetas em uso, para virarem fichas clicáveis na estante. */
   const availableTags = useMemo(() => collectTags(books), [books])
@@ -135,6 +210,9 @@ export function useLibrary() {
     importing,
     message,
     dismissMessage: () => setMessage(null),
+    suggestion,
+    acceptSuggestion,
+    dismissSuggestion,
     importFiles,
     removeFile,
     deleteBook,

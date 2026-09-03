@@ -1,6 +1,7 @@
 import { useRef, useState, type DragEvent, type ReactNode } from 'react'
 import { useLibrary, type StatusFilter } from './useLibrary'
 import { BookCard } from './BookCard'
+import { MergeOffer } from './MergeOffer'
 import { TagEditor } from './TagEditor'
 
 const FILTERS: Array<{ value: StatusFilter; label: string }> = [
@@ -23,10 +24,20 @@ interface LibraryScreenProps {
   onOpenSettings?: () => void
   /** Espaço para o indicador de sincronização, no rodapé do cabeçalho. */
   statusSlot?: ReactNode
+  /** Muda quando a sincronização trouxe algo: a estante relê o espelho. */
+  refreshKey?: number
+  /** Dois livros foram juntados — hora de subir a mudança. */
+  onMerged?: () => void
 }
 
-export function LibraryScreen({ onOpen, onOpenSettings, statusSlot }: LibraryScreenProps) {
-  const library = useLibrary()
+export function LibraryScreen({
+  onOpen,
+  onOpenSettings,
+  statusSlot,
+  refreshKey,
+  onMerged,
+}: LibraryScreenProps) {
+  const library = useLibrary({ refreshKey, onMerged })
   const inputRef = useRef<HTMLInputElement>(null)
   const [pendingBookId, setPendingBookId] = useState<string | undefined>()
   const [dragging, setDragging] = useState(false)
@@ -155,6 +166,14 @@ export function LibraryScreen({ onOpen, onOpenSettings, statusSlot }: LibraryScr
       />
 
       <main className="mx-auto max-w-6xl px-4 py-6">
+        {library.suggestion && (
+          <MergeOffer
+            suggestion={library.suggestion}
+            onMerge={() => void library.acceptSuggestion()}
+            onDismiss={library.dismissSuggestion}
+          />
+        )}
+
         {library.message && (
           <div
             role="alert"

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { importBook } from './importBook'
+import { sha256Hex } from '../hash'
 import { makeEpub } from '../epub/fixtures/makeEpub'
 import { createBookStore } from '../store/bookStore'
 import { localMirror } from '../store/localMirror'
@@ -104,6 +105,28 @@ describe('importBook', () => {
 
     expect(segundo.status).toBe('relinked')
     expect((await localMirror.getBook(primeiro.book.id))?.deletedAt).toBeNull()
+  })
+
+  it('um arquivo cujo hash é alias reconecta ao livro que o adotou', async () => {
+    const original = makeEpub({ title: 'Confissões' })
+    const primeiro = await importBook(new File([original as BlobPart], 'a.epub'))
+    if (primeiro.status !== 'added') throw new Error('deveria ter adicionado')
+
+    // Outra cópia do mesmo livro: bytes diferentes, hash diferente.
+    const outraCopia = makeEpub({ title: 'Confissões', author: 'Agostinho' })
+    const hashDaOutra = await sha256Hex(new Blob([outraCopia as BlobPart]))
+    await localMirror.saveBook({ ...primeiro.book, aliases: [hashDaOutra] })
+    await createBookStore().delete(primeiro.book.id)
+
+    const segundo = await importBook(new File([outraCopia as BlobPart], 'b.epub'))
+
+    expect(segundo.status).toBe('relinked')
+    if (segundo.status !== 'relinked') return
+    expect(segundo.book.id).toBe(primeiro.book.id)
+    // O arquivo fica guardado sob o id do livro, não sob o próprio hash.
+    expect(await createBookStore().has(primeiro.book.id)).toBe(true)
+    expect(await createBookStore().has(hashDaOutra)).toBe(false)
+    expect(await localMirror.listBooks()).toHaveLength(1)
   })
 
   it('lê o PDF pelo carregador injetado e usa os metadados dele', async () => {

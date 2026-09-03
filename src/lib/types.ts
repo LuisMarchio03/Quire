@@ -48,6 +48,12 @@ export interface Book {
   status: BookStatus
   /** Etiquetas livres. Moram no próprio livro para sincronizarem junto com ele. */
   tags: string[]
+  /**
+   * Outros SHA-256 que são este mesmo livro: o arquivo que chegou ao celular
+   * não é byte a byte o do computador, mas o dono disse que é o mesmo. A lista
+   * só cresce — ao aplicar uma mudança vinda do servidor, faz-se a união.
+   */
+  aliases: string[]
   addedAt: string
   updatedAt: string
   deletedAt: string | null

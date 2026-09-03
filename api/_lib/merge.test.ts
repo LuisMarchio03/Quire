@@ -29,7 +29,7 @@ describe('linhas do banco viram objetos de domínio', () => {
     })
     expect(book).toEqual({
       id: 'h1', title: 'Grande Sertão', author: null, format: 'epub', language: 'pt',
-      coverUrl: null, fileSize: 42, spineCount: 3, status: 'reading', tags: ['Ficção'],
+      coverUrl: null, fileSize: 42, spineCount: 3, status: 'reading', tags: ['Ficção'], aliases: [],
       addedAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-02T00:00:00.000Z', deletedAt: null,
     })
   })
@@ -150,6 +150,52 @@ describe('etiquetas na sincronização', () => {
     expect(parseChange({ entity: 'book', data: { ...livro, tags: [3] } })).toBeNull()
     expect(
       parseChange({ entity: 'book', data: { ...livro, tags: Array(100).fill('x') } }),
+    ).toBeNull()
+  })
+})
+
+describe('aliases na sincronização', () => {
+  const linhaBase = {
+    id: 'h1', title: 'Livro', author: null, format: 'epub', language: null,
+    cover_url: null, file_size: 1, spine_count: 1, status: 'unread', tags: '[]',
+    added_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-01-01T00:00:00.000Z',
+    synced_at: '2026-01-01T00:00:00.000Z', deleted_at: null,
+  }
+
+  it('lê a lista de aliases guardada como JSON', () => {
+    expect(rowToBook({ ...linhaBase, aliases: '["h2","h3"]' }).aliases).toEqual(['h2', 'h3'])
+  })
+
+  it('banco antigo sem a coluna vira lista vazia', () => {
+    expect(rowToBook({ ...linhaBase, aliases: null }).aliases).toEqual([])
+    expect(rowToBook(linhaBase).aliases).toEqual([])
+  })
+
+  const livro = {
+    id: 'h1', title: 'Livro', author: null, format: 'epub', language: null, coverUrl: null,
+    fileSize: 1, spineCount: 1, status: 'unread', tags: [], addedAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z', deletedAt: null,
+  }
+
+  it('aceita aliases bem formados', () => {
+    const change = parseChange({ entity: 'book', data: { ...livro, aliases: ['h2'] } })
+    expect(change?.entity === 'book' && change.data.aliases).toEqual(['h2'])
+  })
+
+  it('livro sem o campo entra com lista vazia', () => {
+    const change = parseChange({ entity: 'book', data: livro })
+    expect(change?.entity === 'book' && change.data.aliases).toEqual([])
+  })
+
+  it('recusa alias que não é texto, vazio, longo demais ou lista longa demais', () => {
+    expect(parseChange({ entity: 'book', data: { ...livro, aliases: 'h2' } })).toBeNull()
+    expect(parseChange({ entity: 'book', data: { ...livro, aliases: [3] } })).toBeNull()
+    expect(parseChange({ entity: 'book', data: { ...livro, aliases: [''] } })).toBeNull()
+    expect(
+      parseChange({ entity: 'book', data: { ...livro, aliases: ['x'.repeat(201)] } }),
+    ).toBeNull()
+    expect(
+      parseChange({ entity: 'book', data: { ...livro, aliases: Array(100).fill('h2') } }),
     ).toBeNull()
   })
 })

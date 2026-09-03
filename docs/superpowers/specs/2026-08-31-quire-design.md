@@ -56,6 +56,11 @@ duplicata e sem reconfiguração.
 Um arquivo diferente do mesmo título é outro livro. É o comportamento correto:
 âncoras de destaque não sobrevivem a uma edição diferente.
 
+> **Revisto em 2026-09-03.** Na prática o mesmo livro chega a cada aparelho
+> como um arquivo ligeiramente diferente. O dono passou a poder declarar que
+> dois arquivos são o mesmo livro (`aliases`); ver
+> `2026-09-03-mesmo-livro-arquivos-diferentes-design.md`.
+
 ### Persistência do arquivo
 
 Os bytes vão para IndexedDB, atrás de uma interface `BookStore`

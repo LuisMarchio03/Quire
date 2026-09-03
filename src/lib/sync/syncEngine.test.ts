@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createSyncEngine, type SyncTransport } from './syncEngine'
 import { localMirror } from '../store/localMirror'
+import { createBookStore } from '../store/bookStore'
 import { deleteQuireDb } from '../store/idb'
 import type { Book } from '../types'
 
@@ -15,6 +16,7 @@ const book = (overrides: Partial<Book> = {}): Book => ({
   spineCount: 1,
   status: 'unread',
   tags: [],
+  aliases: [],
   addedAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
   deletedAt: null,
@@ -167,6 +169,133 @@ describe('syncEngine', () => {
 
     engine.stop()
     window.dispatchEvent(new Event('online'))
+    await new Promise((r) => setTimeout(r, 20))
+    expect(calls).toHaveLength(2)
+  })
+})
+
+describe('syncEngine — aliases e arquivos', () => {
+  beforeEach(async () => {
+    await deleteQuireDb()
+  })
+
+  it('os aliases vindos do servidor se somam aos já conhecidos, e a união é reenviada', async () => {
+    await localMirror.saveBook(book({ aliases: ['x'] }), { queue: false })
+    const { transport } = fakeTransport({
+      changes: [
+        { entity: 'book', data: book({ aliases: ['y'], updatedAt: '2026-02-01T00:00:00.000Z' }) },
+      ],
+    })
+
+    await engineWith(transport).syncNow()
+
+    const local = await localMirror.getBook('h1')
+    expect(local?.aliases).toEqual(['y', 'x'])
+    // Carimbo novo, senão o servidor recusa o reenvio como repetição.
+    expect(local!.updatedAt > '2026-02-01T00:00:00.000Z').toBe(true)
+    expect((await localMirror.drainOutbox()).map((e) => e.id)).toEqual(['book:h1'])
+  })
+
+  it('registro local mais novo não perde alias que só o servidor conhecia', async () => {
+    await localMirror.saveBook(
+      book({ aliases: [], updatedAt: '2026-05-01T00:00:00.000Z', title: 'Local novo' }),
+      { queue: false },
+    )
+    const { transport } = fakeTransport({
+      changes: [
+        { entity: 'book', data: book({ aliases: ['y'], updatedAt: '2026-01-01T00:00:00.000Z' }) },
+      ],
+    })
+
+    await engineWith(transport).syncNow()
+
+    const local = await localMirror.getBook('h1')
+    expect(local?.title).toBe('Local novo')
+    expect(local?.aliases).toEqual(['y'])
+    expect(local!.updatedAt > '2026-05-01T00:00:00.000Z').toBe(true)
+    expect((await localMirror.drainOutbox()).map((e) => e.id)).toEqual(['book:h1'])
+  })
+
+  it('sem alias novo, nada é reenviado', async () => {
+    await localMirror.saveBook(
+      book({ aliases: ['x'], updatedAt: '2026-05-01T00:00:00.000Z' }),
+      { queue: false },
+    )
+    const { transport } = fakeTransport({
+      changes: [
+        { entity: 'book', data: book({ aliases: ['x'], updatedAt: '2026-01-01T00:00:00.000Z' }) },
+      ],
+    })
+
+    await engineWith(transport).syncNow()
+
+    expect(await localMirror.drainOutbox()).toHaveLength(0)
+  })
+
+  it('arquivo guardado sob um alias passa a servir o livro quando o alias chega', async () => {
+    const store = createBookStore()
+    await store.put('h2', new Blob([new Uint8Array([9])]))
+    const { transport } = fakeTransport({
+      changes: [{ entity: 'book', data: book({ aliases: ['h2'] }) }],
+    })
+
+    await engineWith(transport).syncNow()
+
+    expect(await store.has('h1')).toBe(true)
+    expect(await store.has('h2')).toBe(false)
+    expect(Array.from((await store.getBytes('h1')) ?? [])).toEqual([9])
+  })
+
+  it('se o livro já tem arquivo aqui, o guardado sob o alias é só apagado', async () => {
+    const store = createBookStore()
+    await store.put('h1', new Blob([new Uint8Array([1])]))
+    await store.put('h2', new Blob([new Uint8Array([2])]))
+    const { transport } = fakeTransport({
+      changes: [{ entity: 'book', data: book({ aliases: ['h2'] }) }],
+    })
+
+    await engineWith(transport).syncNow()
+
+    expect(Array.from((await store.getBytes('h1')) ?? [])).toEqual([1])
+    expect(await store.has('h2')).toBe(false)
+  })
+
+  it('avisa quantas mudanças chegaram, e só quando chegou alguma', async () => {
+    const pulled: number[] = []
+    const cheio = fakeTransport({ changes: [{ entity: 'book', data: book() }] })
+    await createSyncEngine({
+      transport: cheio.transport,
+      listLocalFiles: async () => [],
+      onPulled: (n) => pulled.push(n),
+    }).syncNow()
+
+    const vazio = fakeTransport()
+    await createSyncEngine({
+      transport: vazio.transport,
+      listLocalFiles: async () => [],
+      onPulled: (n) => pulled.push(n),
+    }).syncNow()
+
+    expect(pulled).toEqual([1])
+  })
+
+  it('a aba voltar a ficar visível dispara uma sincronização; ficar escondida, não', async () => {
+    const { transport, calls } = fakeTransport()
+    const engine = engineWith(transport)
+    engine.start({ intervalMs: 0 })
+    await vi.waitFor(() => expect(calls.length).toBe(1))
+
+    document.dispatchEvent(new Event('visibilitychange'))
+    await vi.waitFor(() => expect(calls.length).toBe(2))
+
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true })
+    document.dispatchEvent(new Event('visibilitychange'))
+    await new Promise((r) => setTimeout(r, 20))
+    expect(calls).toHaveLength(2)
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
+
+    engine.stop()
+    document.dispatchEvent(new Event('visibilitychange'))
     await new Promise((r) => setTimeout(r, 20))
     expect(calls).toHaveLength(2)
   })

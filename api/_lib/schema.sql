@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS books (
   status      TEXT NOT NULL DEFAULT 'unread'
               CHECK (status IN ('unread', 'reading', 'finished')),
   tags        TEXT NOT NULL DEFAULT '[]',   -- JSON com as etiquetas do livro
+  aliases     TEXT NOT NULL DEFAULT '[]',   -- JSON: outros hashes de arquivo que são este livro
   added_at    TEXT NOT NULL,
   updated_at  TEXT NOT NULL,               -- relógio do aparelho; resolve conflito
   synced_at   TEXT NOT NULL,               -- relógio do servidor; move o cursor

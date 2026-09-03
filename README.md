@@ -10,7 +10,7 @@
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38BDF8?logo=tailwindcss&logoColor=white)
 ![Turso](https://img.shields.io/badge/Turso-libSQL-4FF8D2?logo=turso&logoColor=black)
 ![PWA](https://img.shields.io/badge/PWA-instalável-5A0FC8?logo=pwa&logoColor=white)
-![Testes](https://img.shields.io/badge/testes-352%20passando-3FB950)
+![Testes](https://img.shields.io/badge/testes-399%20passando-3FB950)
 
 </div>
 
@@ -40,9 +40,21 @@ e destaques — marcado como indisponível ali. Quando você escolhe o mesmo arq
 naquele aparelho, o hash bate e o livro reencontra o próprio histórico. Sem
 duplicata e sem reconfiguração.
 
+Nem sempre o mesmo livro chega aos dois aparelhos como o mesmo arquivo — baixado
+de novo, salvo por outro caminho, com metadado mexido, o hash muda. Quando a
+estante vê dois livros com o mesmo formato, a mesma contagem de páginas e um
+título parecido, ela pergunta se é o mesmo livro e oferece **juntar**: fica um
+só, com o progresso mais recente, as anotações e as etiquetas dos dois, e cada
+aparelho continua usando o arquivo que já tinha. O hash do outro arquivo vira
+um *alias* do livro, então reimportá-lo em qualquer aparelho reencontra o livro
+certo. *Adicionar arquivo aqui* com um arquivo parecido, mas não idêntico, faz a
+mesma oferta.
+
 Toda escrita é aplicada primeiro no aparelho e entra numa fila que sobe quando há
 rede. Conflito entre dois aparelhos resolve por última escrita vence, registro a
-registro.
+registro. A estante se atualiza quando a sincronização traz algo; fechar um
+livro sobe a posição na hora; e o app sincroniza ao voltar para o primeiro
+plano no celular.
 
 ## Funcionalidades
 
@@ -60,6 +72,9 @@ registro.
 - **Etiquetas livres**, com fichas clicáveis na estante que se combinam, e um
   campo de busca só que casa título, autor e etiqueta. EPUB traz as etiquetas
   sugeridas do próprio metadado.
+- **O mesmo livro, arquivos diferentes.** A estante percebe quando um livro
+  entrou duas vezes por arquivos distintos e oferece juntar os dois — o
+  progresso passa a ser um só em todos os aparelhos.
 - **Tamanho da interface ajustável** (80% a 150%), por atalho, pinça ou ajustes.
 - **Busca dentro do livro**, ignorando acento e caixa.
 - **Exportação em Markdown** de tudo que você marcou.
@@ -107,7 +122,7 @@ lugar nenhum — só o derivado PBKDF2-SHA256 com 210 000 iterações.
 
 ```bash
 npm run dev      # http://localhost:5273
-npm test         # 352 testes
+npm test         # 399 testes
 npm run build
 ```
 
@@ -129,7 +144,8 @@ Depois, use *Adicionar à tela de início* para instalar o PWA.
 ## Estrutura
 
 ```
-src/lib/          hash, epub, reader (motores), anchor, store, sync, api
+src/lib/          hash, epub, reader (motores), anchor, library (importação,
+                  gêmeos, junção, aliases), store, sync, api
 src/features/     library, reader, annotations, auth, settings
 api/              funções serverless: login, pair, me, sync
 api/_lib/         cliente Turso, sessão, autenticação, merge, esquema SQL

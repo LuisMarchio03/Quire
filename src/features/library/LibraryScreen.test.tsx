@@ -19,6 +19,7 @@ const book = (overrides: Partial<Book> = {}): Book => ({
   spineCount: 10,
   status: 'unread',
   tags: [],
+  aliases: [],
   addedAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
   deletedAt: null,
@@ -414,5 +415,112 @@ describe('LibraryScreen — etiquetas', () => {
     await userEvent.click(within(dialogo).getByRole('button', { name: /salvar/i }))
 
     await waitFor(async () => expect((await localMirror.getBook('1'))?.tags).toEqual(['Ficção']))
+  })
+})
+
+describe('LibraryScreen — o mesmo livro, arquivos diferentes', () => {
+  beforeEach(async () => {
+    localStorage.clear()
+    await deleteQuireDb()
+  })
+
+  const gemeos = () => [
+    book({ id: 'pc', title: 'confissoes-santo-agostinho', format: 'pdf', spineCount: 399 }),
+    book({
+      id: 'celular',
+      title: 'Confissões — Santo Agostinho',
+      format: 'pdf',
+      spineCount: 399,
+      addedAt: '2026-02-01T00:00:00.000Z',
+    }),
+  ]
+
+  it('sugere juntar dois livros que parecem ser o mesmo', async () => {
+    await seed(gemeos(), ['celular'])
+
+    render(<LibraryScreen onOpen={() => {}} />)
+
+    expect(await screen.findByText(/parece estar duas vezes/i)).toBeTruthy()
+  })
+
+  it('juntar deixa um livro só, com o arquivo daqui e o progresso mais recente', async () => {
+    await seed(gemeos(), ['celular'])
+    await localMirror.saveProgress(
+      {
+        bookId: 'pc',
+        locator: { spineIndex: 21, progressInSpine: 0 },
+        percent: 0.055,
+        updatedAt: '2026-09-03T00:00:00.000Z',
+      },
+      { queue: false },
+    )
+    render(<LibraryScreen onOpen={() => {}} />)
+    await screen.findByText(/parece estar duas vezes/i)
+
+    await userEvent.click(screen.getByRole('button', { name: /^juntar/i }))
+
+    await waitFor(() => expect(screen.getAllByRole('article')).toHaveLength(1))
+    const restante = screen.getByRole('article', { name: /confissoes-santo-agostinho/ })
+    expect(restante.textContent).not.toMatch(/não está neste aparelho/i)
+    expect(restante.textContent).toMatch(/6%/)
+    expect((await localMirror.getBook('pc'))?.aliases).toEqual(['celular'])
+    expect((await localMirror.getBook('celular'))?.deletedAt).toBeTruthy()
+    expect(screen.queryByText(/parece estar duas vezes/i)).toBeNull()
+  })
+
+  it('recusar guarda a escolha: a sugestão não volta', async () => {
+    await seed(gemeos(), ['celular'])
+    const view = render(<LibraryScreen onOpen={() => {}} />)
+    await screen.findByText(/parece estar duas vezes/i)
+
+    await userEvent.click(screen.getByRole('button', { name: /são livros diferentes/i }))
+
+    expect(screen.queryByText(/parece estar duas vezes/i)).toBeNull()
+    view.unmount()
+    render(<LibraryScreen onOpen={() => {}} />)
+    await waitFor(() => expect(screen.getAllByRole('article')).toHaveLength(2))
+    expect(screen.queryByText(/parece estar duas vezes/i)).toBeNull()
+  })
+
+  it('"adicionar arquivo aqui" com arquivo parecido, mas não idêntico, oferece juntar', async () => {
+    // O livro veio do outro aparelho: mesmo título e mesma contagem, hash diferente.
+    await seed([book({ id: 'do-pc', title: 'Iracema', format: 'epub', spineCount: 2 })])
+    render(<LibraryScreen onOpen={() => {}} />)
+    await userEvent.click(await screen.findByRole('button', { name: /adicionar arquivo aqui/i }))
+
+    const file = new File([makeEpub({ title: 'Iracema', author: 'Alencar' }) as BlobPart], 'iracema.epub')
+    await userEvent.upload(screen.getByLabelText(/adicionar livros/i), file)
+
+    expect(await screen.findByText(/não é idêntico/i)).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: /^juntar/i }))
+
+    await waitFor(() => expect(screen.getAllByRole('article')).toHaveLength(1))
+    expect(await createBookStore().has('do-pc')).toBe(true)
+    expect((await localMirror.getBook('do-pc'))?.aliases).toHaveLength(1)
+    expect(screen.queryByText(/não é idêntico/i)).toBeNull()
+  })
+
+  it('arquivo de outro formato continua sendo outro livro', async () => {
+    await seed([book({ id: 'do-pc', title: 'Iracema', format: 'pdf', spineCount: 2 })])
+    render(<LibraryScreen onOpen={() => {}} />)
+    await userEvent.click(await screen.findByRole('button', { name: /adicionar arquivo aqui/i }))
+
+    const file = new File([makeEpub({ title: 'Iracema' }) as BlobPart], 'iracema.epub')
+    await userEvent.upload(screen.getByLabelText(/adicionar livros/i), file)
+
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect(screen.queryByText(/não é idêntico/i)).toBeNull()
+    await waitFor(() => expect(screen.getAllByRole('article')).toHaveLength(2))
+  })
+
+  it('a estante se atualiza quando a sincronização traz mudança', async () => {
+    await seed([book()])
+    const view = render(<LibraryScreen onOpen={() => {}} refreshKey={0} />)
+    await screen.findByRole('heading', { name: 'Grande Sertão: Veredas' })
+
+    await localMirror.saveBook(book({ id: 'id-2', title: 'Vidas Secas' }), { queue: false })
+    view.rerender(<LibraryScreen onOpen={() => {}} refreshKey={1} />)
+
+    expect(await screen.findByRole('heading', { name: 'Vidas Secas' })).toBeTruthy()
   })
 })

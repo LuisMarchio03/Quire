@@ -59,9 +59,11 @@ export async function importBook(file: File, options: ImportOptions = {}): Promi
   report('hash', 0)
   const id = await sha256Hex(file, (fraction) => report('hash', fraction))
 
-  const existing = await localMirror.getBook(id)
+  // Pelo id ou por alias: um arquivo que o dono já disse ser "o mesmo livro"
+  // reencontra o registro dele, e fica guardado sob o id desse registro.
+  const existing = await localMirror.findBookByFileId(id)
   if (existing) {
-    if (!(await store.has(id))) await store.put(id, file)
+    if (!(await store.has(existing.id))) await store.put(existing.id, file)
     const restored: Book = existing.deletedAt
       ? { ...existing, deletedAt: null, updatedAt: nowIso() }
       : existing
@@ -123,6 +125,7 @@ export async function importBook(file: File, options: ImportOptions = {}): Promi
     spineCount,
     status: 'unread',
     tags,
+    aliases: [],
     addedAt: now,
     updatedAt: now,
     deletedAt: null,

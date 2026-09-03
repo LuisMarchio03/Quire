@@ -21,6 +21,7 @@ await client.executeMultiple(readFileSync(schemaPath, 'utf8'))
 // nova precisa ser acrescentada à parte para um banco antigo alcançar o esquema.
 const MIGRACOES: Array<{ tabela: string; coluna: string; definicao: string }> = [
   { tabela: 'books', coluna: 'tags', definicao: "TEXT NOT NULL DEFAULT '[]'" },
+  { tabela: 'books', coluna: 'aliases', definicao: "TEXT NOT NULL DEFAULT '[]'" },
 ]
 
 for (const { tabela, coluna, definicao } of MIGRACOES) {

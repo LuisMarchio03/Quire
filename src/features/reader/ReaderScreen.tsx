@@ -81,6 +81,7 @@ export function ReaderScreen({ bookId, onClose, uiScale }: ReaderScreenProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const clearPaint = useRef<() => void>(() => {})
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingProgress = useRef<{ locator: Locator; ratio: number } | null>(null)
   const fontAtPinchStart = useRef<number | null>(null)
 
   // ---- abertura do livro -------------------------------------------------
@@ -149,28 +150,36 @@ export function ReaderScreen({ bookId, onClose, uiScale }: ReaderScreenProps) {
   }, [bookId])
 
   // ---- posição ------------------------------------------------------------
+  const flushProgress = useCallback(async () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = null
+    const pending = pendingProgress.current
+    if (!pending) return
+    pendingProgress.current = null
+
+    const now = nowIso()
+    await localMirror.saveProgress({
+      bookId,
+      locator: pending.locator,
+      percent: pending.ratio,
+      updatedAt: now,
+    })
+    const currentBook = await localMirror.getBook(bookId)
+    if (!currentBook) return
+    const status = pending.ratio >= 0.98 ? 'finished' : 'reading'
+    if (currentBook.status !== status) {
+      await localMirror.saveBook({ ...currentBook, status, updatedAt: now })
+    }
+  }, [bookId])
+
+  /** Virar página a página não pode virar uma escrita por página: espera-se um segundo de calma. */
   const persistProgress = useCallback(
     (current: Locator, ratio: number) => {
+      pendingProgress.current = { locator: current, ratio }
       if (saveTimer.current) clearTimeout(saveTimer.current)
-      saveTimer.current = setTimeout(() => {
-        void (async () => {
-          const now = nowIso()
-          await localMirror.saveProgress({
-            bookId,
-            locator: current,
-            percent: ratio,
-            updatedAt: now,
-          })
-          const currentBook = await localMirror.getBook(bookId)
-          if (!currentBook) return
-          const status = ratio >= 0.98 ? 'finished' : 'reading'
-          if (currentBook.status !== status) {
-            await localMirror.saveBook({ ...currentBook, status, updatedAt: now })
-          }
-        })()
-      }, SAVE_DELAY_MS)
+      saveTimer.current = setTimeout(() => void flushProgress(), SAVE_DELAY_MS)
     },
-    [bookId],
+    [flushProgress],
   )
 
   useEffect(() => {
@@ -183,9 +192,20 @@ export function ReaderScreen({ bookId, onClose, uiScale }: ReaderScreenProps) {
     })
   }, [engine, persistProgress])
 
-  useEffect(() => () => {
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-  }, [])
+  // Fechar o livro grava a posição pendente antes de sair: virar a página e
+  // voltar à estante no mesmo segundo não pode perder onde se parou — é essa
+  // posição que o outro aparelho vai receber.
+  const close = useCallback(async () => {
+    await flushProgress()
+    onClose()
+  }, [flushProgress, onClose])
+
+  useEffect(
+    () => () => {
+      void flushProgress()
+    },
+    [flushProgress],
+  )
 
   // ---- a tela do celular muda o tempo todo --------------------------------
   useEffect(() => {
@@ -476,7 +496,7 @@ export function ReaderScreen({ bookId, onClose, uiScale }: ReaderScreenProps) {
           focusEnabled={focus.enabled}
           zoom={engine?.canZoom() ? { value: zoom, onChange: (v) => void applyZoom(v) } : undefined}
           crop={engine?.canCrop() ? { enabled: crop, onToggle: () => void toggleCrop() } : undefined}
-          onBack={onClose}
+          onBack={() => void close()}
           onPrev={() => void engine?.prev()}
           onNext={() => void engine?.next()}
           atStart={locator.spineIndex === 0 && pageInfo.page === 1}

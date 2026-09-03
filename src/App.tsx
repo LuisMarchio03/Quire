@@ -18,6 +18,8 @@ export function App() {
   const uiScale = useUiScale()
   const [route, setRoute] = useState<Route>({ name: 'library' })
   const [syncState, setSyncState] = useState<SyncState>('idle')
+  /** Sobe a cada sincronização que trouxe algo; a estante relê quando muda. */
+  const [syncTick, setSyncTick] = useState(0)
   const syncEngine = useRef<SyncEngine | null>(null)
 
   // Pedido único e silencioso: sem isso o navegador pode despejar os arquivos
@@ -66,6 +68,7 @@ export function App() {
       transport: httpSyncTransport,
       listLocalFiles: () => createBookStore().list(),
       onStateChange: setSyncState,
+      onPulled: () => setSyncTick((tick) => tick + 1),
     })
     syncEngine.current = engine
     engine.start()
@@ -93,11 +96,18 @@ export function App() {
     )
   }
 
+  const syncNow = () => void syncEngine.current?.syncNow()
+
   if (route.name === 'reader') {
     return (
       <ReaderScreen
         bookId={route.bookId}
-        onClose={() => setRoute({ name: 'library' })}
+        onClose={() => {
+          setRoute({ name: 'library' })
+          // A posição de leitura acabou de ser gravada: sobe agora, e o outro
+          // aparelho a encontra em segundos em vez de esperar o próximo ciclo.
+          syncNow()
+        }}
         uiScale={uiScale}
       />
     )
@@ -118,9 +128,11 @@ export function App() {
     <LibraryScreen
       onOpen={(bookId) => setRoute({ name: 'reader', bookId })}
       onOpenSettings={() => setRoute({ name: 'settings' })}
+      refreshKey={syncTick}
+      onMerged={syncNow}
       statusSlot={
         signedIn ? (
-          <SyncIndicator state={syncState} onSyncNow={() => void syncEngine.current?.syncNow()} />
+          <SyncIndicator state={syncState} onSyncNow={syncNow} />
         ) : (
           <span className="text-xs text-ink-faint">Só neste aparelho — sem sincronização</span>
         )

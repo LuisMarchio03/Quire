@@ -352,4 +352,78 @@ describe.skipIf(!live)('Turso — esquema e sincronização', () => {
     })
     expect(rows[0].deleted_at).toBeTruthy()
   })
+
+  it('aliases fazem a viagem de ida e volta', async () => {
+    const bookId = `${PREFIX}livro`
+    const gravar = response()
+    await handleSync(
+      request({
+        since: null,
+        changes: [
+          {
+            entity: 'book',
+            data: {
+              id: bookId,
+              title: 'Versão Nova',
+              author: 'Vitest',
+              format: 'epub',
+              language: 'pt-BR',
+              coverUrl: null,
+              fileSize: 123,
+              spineCount: 4,
+              status: 'finished',
+              aliases: [`${PREFIX}outro-hash`],
+              addedAt: stamp('2026-01-01T00:00:00.000Z'),
+              updatedAt: stamp('2026-08-01T00:00:00.000Z'),
+              deletedAt: null,
+            },
+          },
+        ],
+      }),
+      gravar.res,
+    )
+    expect((gravar.state.body as { rejected: number[] }).rejected).toEqual([])
+
+    const ler = response()
+    await handleSync(request({ since: null, changes: [] }), ler.res)
+    const { changes } = ler.state.body as {
+      changes: Array<{ entity: string; data: { id: string; aliases?: string[] } }>
+    }
+    const livro = changes.find((c) => c.entity === 'book' && c.data.id === bookId)
+    expect(livro?.data.aliases).toEqual([`${PREFIX}outro-hash`])
+  })
+
+  it('anotação pode mudar de livro', async () => {
+    const mover = response()
+    await handleSync(
+      request({
+        since: null,
+        changes: [
+          {
+            entity: 'annotation',
+            data: {
+              id: `${PREFIX}ann`,
+              bookId: `${PREFIX}livro-2`,
+              type: 'highlight',
+              color: '#e8c468',
+              anchor: { kind: 'epub', spineIndex: 2, startPath: [0, 0], startOffset: 1, endPath: [0, 0], endOffset: 8 },
+              quotedText: 'trecho de teste',
+              noteText: null,
+              createdAt: stamp('2026-01-01T00:00:00.000Z'),
+              updatedAt: stamp('2026-08-02T00:00:00.000Z'),
+              deletedAt: null,
+            },
+          },
+        ],
+      }),
+      mover.res,
+    )
+
+    const { rows } = await client.execute({
+      sql: 'SELECT book_id, deleted_at FROM annotations WHERE id = ?',
+      args: [`${PREFIX}ann`],
+    })
+    expect(rows[0].book_id).toBe(`${PREFIX}livro-2`)
+    expect(rows[0].deleted_at).toBeNull()
+  })
 })

@@ -15,6 +15,7 @@ function makeBook(overrides: Partial<Book> = {}): Book {
     spineCount: 12,
     status: 'unread',
     tags: [],
+    aliases: [],
     addedAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
     deletedAt: null,
@@ -119,5 +120,33 @@ describe('localMirror', () => {
     expect(await localMirror.getSyncCursor()).toBeNull()
     await localMirror.setSyncCursor('2026-05-01T00:00:00.000Z')
     expect(await localMirror.getSyncCursor()).toBe('2026-05-01T00:00:00.000Z')
+  })
+})
+
+describe('localMirror — livro por hash de arquivo', () => {
+  beforeEach(async () => {
+    await deleteQuireDb()
+  })
+
+  it('encontra o livro pelo próprio id', async () => {
+    await localMirror.saveBook(makeBook({ id: 'hash-1' }))
+    expect((await localMirror.findBookByFileId('hash-1'))?.id).toBe('hash-1')
+  })
+
+  it('encontra o livro por um alias', async () => {
+    await localMirror.saveBook(makeBook({ id: 'hash-1', aliases: ['hash-2'] }))
+    expect((await localMirror.findBookByFileId('hash-2'))?.id).toBe('hash-1')
+  })
+
+  it('hash que nenhum livro conhece: undefined', async () => {
+    await localMirror.saveBook(makeBook())
+    expect(await localMirror.findBookByFileId('hash-9')).toBeUndefined()
+  })
+
+  it('livro guardado antes de existir a lista de aliases não quebra a busca', async () => {
+    const antigo = makeBook()
+    delete (antigo as Partial<Book>).aliases
+    await localMirror.saveBook(antigo)
+    expect(await localMirror.findBookByFileId('hash-2')).toBeUndefined()
   })
 })
