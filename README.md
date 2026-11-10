@@ -153,7 +153,7 @@ src/lib/          hash, epub, reader (motores), anchor, library (importação,
 src/features/     library, reader, annotations, auth, settings
 api/              funções serverless: login, pair, me, sync
 api/_lib/         cliente Turso, sessão, autenticação, merge, esquema SQL
-scripts/          setup-db, hash-password, make-icons
+scripts/          setup-db, hash-password, icons.sh
 docs/superpowers/ design e plano de implementação
 ```
 
